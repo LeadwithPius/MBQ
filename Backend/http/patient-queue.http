@@ -1,0 +1,115 @@
+# Manual test script for the Patient & Queue API.
+# Open in VS Code with the "REST Client" extension (Huachao Mao) and click "Send Request"
+# above each block, top to bottom. The app must be running: .\mvnw.cmd spring-boot:run
+# Seeded departments on a fresh database: 1 = OPD, 2 = Emergency, 3 = Maternity
+
+@baseUrl = http://localhost:8080
+@opd = 1
+
+### 1. Register a patient  -> 201
+# @name patientA
+POST {{baseUrl}}/api/patients
+Content-Type: application/json
+
+{
+  "name": "Mwaba Banda",
+  "age": 34,
+  "sex": "FEMALE",
+  "contact": "+260971234567",
+  "bloodGroup": "O_POS"
+}
+
+### 2. Register a second patient  -> 201
+# @name patientB
+POST {{baseUrl}}/api/patients
+Content-Type: application/json
+
+{
+  "name": "Chanda Phiri",
+  "age": 52,
+  "sex": "MALE"
+}
+
+### 3. Validation error  -> 400 with fieldErrors
+POST {{baseUrl}}/api/patients
+Content-Type: application/json
+
+{
+  "name": "",
+  "age": -1,
+  "sex": "x"
+}
+
+### 4. Get patient A  -> 200
+GET {{baseUrl}}/api/patients/{{patientA.response.body.id}}
+
+### 5. Search by name  -> 200
+GET {{baseUrl}}/api/patients?name=banda
+
+### 6. Ticket for patient A in OPD  -> 201, OPD-00x, position 1
+# @name ticketA
+POST {{baseUrl}}/api/queue/tickets
+Content-Type: application/json
+
+{
+  "patientId": {{patientA.response.body.id}},
+  "departmentId": {{opd}}
+}
+
+### 7. Ticket for patient B in OPD  -> 201, position 2
+# @name ticketB
+POST {{baseUrl}}/api/queue/tickets
+Content-Type: application/json
+
+{
+  "patientId": {{patientB.response.body.id}},
+  "departmentId": {{opd}}
+}
+
+### 8. Duplicate active ticket for patient A  -> 409
+POST {{baseUrl}}/api/queue/tickets
+Content-Type: application/json
+
+{
+  "patientId": {{patientA.response.body.id}},
+  "departmentId": {{opd}}
+}
+
+### 9. Triage flags patient B as EMERGENCY  -> 200, position 1
+PATCH {{baseUrl}}/api/queue/tickets/{{ticketB.response.body.id}}/priority
+Content-Type: application/json
+
+{
+  "priorityLevel": "EMERGENCY",
+  "triageNotes": "Severe bleeding",
+  "requiresBlood": true
+}
+
+### 10. Live OPD queue  -> patient B first
+GET {{baseUrl}}/api/queue/departments/{{opd}}
+
+### 11. Call next  -> 200, patient B now IN_PROGRESS
+POST {{baseUrl}}/api/queue/departments/{{opd}}/call-next
+
+### 12. Complete patient B's consultation  -> 200
+PATCH {{baseUrl}}/api/queue/tickets/{{ticketB.response.body.id}}/status
+Content-Type: application/json
+
+{
+  "status": "COMPLETED",
+  "outcome": "Transfused 2 units, admitted to ward"
+}
+
+### 13. Invalid change: completed -> waiting  -> 409
+PATCH {{baseUrl}}/api/queue/tickets/{{ticketB.response.body.id}}/status
+Content-Type: application/json
+
+{
+  "status": "WAITING"
+}
+
+### 14. Today's OPD tickets that are still waiting  -> 200
+GET {{baseUrl}}/api/queue/tickets?departmentId={{opd}}&status=WAITING
+
+### 15. Get ticket A  -> 200, position 1
+GET {{baseUrl}}/api/queue/tickets/{{ticketA.response.body.id}}
