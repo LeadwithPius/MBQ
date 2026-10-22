@@ -1,0 +1,40 @@
+# Builds the Spring Boot backend and runs all its tests on every push and pull request.
+# A red X on a pull request means something is broken; a green tick means it is safe to review.
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "Backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "Backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build and run tests
+        run: mvn -B verify
+
+      - name: Upload test reports if tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: Backend/target/surefire-reports/

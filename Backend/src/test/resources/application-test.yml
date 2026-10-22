@@ -1,0 +1,17 @@
+# Used only by the automated tests (activated with @ActiveProfiles("test")).
+# Runs against an in-memory H2 database in PostgreSQL mode, so tests need no PostgreSQL install.
+# Flyway still runs the real migrations (V1, V2...) to build the schema.
+spring:
+  datasource:
+    url: jdbc:h2:mem:mbq_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      # Schema validation stays on for the real PostgreSQL run (application.yml).
+      # H2 reports some column types differently from PostgreSQL, so it is switched off here.
+      ddl-auto: none
+    show-sql: false
+  flyway:
+    enabled: true
