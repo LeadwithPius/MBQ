@@ -28,7 +28,7 @@ public class StaffUser {
     private Role role;
 
     @Column(nullable = false)
-    private boolean active;
+    private boolean active = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
