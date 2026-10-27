@@ -1,5 +1,20 @@
 package com.MBQ.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import com.MBQ.dto.QueueDtos.CreateTicketRequest;
 import com.MBQ.dto.QueueDtos.PatientRegistrationRequest;
 import com.MBQ.dto.QueueDtos.PatientResponse;
@@ -12,24 +27,14 @@ import com.MBQ.model.Patient;
 import com.MBQ.model.PriorityLevel;
 import com.MBQ.model.QueueTicket;
 import com.MBQ.model.QueueTicketStatusHistory;
+import com.MBQ.model.StaffUser;
 import com.MBQ.model.TicketStatus;
 import com.MBQ.repository.DepartmentRepository;
 import com.MBQ.repository.FacilityRepository;
 import com.MBQ.repository.PatientRepository;
 import com.MBQ.repository.QueueTicketRepository;
 import com.MBQ.repository.QueueTicketStatusHistoryRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import com.MBQ.repository.StaffUserRepository;
 
 @Service
 public class QueueService {
@@ -40,22 +45,25 @@ public class QueueService {
     private final QueueTicketRepository queueTicketRepository;
     private final QueueTicketStatusHistoryRepository historyRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final StaffUserRepository staffUserRepository;
 
-    public QueueService(
-            PatientRepository patientRepository,
-            FacilityRepository facilityRepository,
-            DepartmentRepository departmentRepository,
-            QueueTicketRepository queueTicketRepository,
-            QueueTicketStatusHistoryRepository historyRepository,
-            JdbcTemplate jdbcTemplate
-    ) {
-        this.patientRepository = patientRepository;
-        this.facilityRepository = facilityRepository;
-        this.departmentRepository = departmentRepository;
-        this.queueTicketRepository = queueTicketRepository;
-        this.historyRepository = historyRepository;
-        this.jdbcTemplate = jdbcTemplate;
-    }
+ public QueueService(
+        PatientRepository patientRepository,
+        FacilityRepository facilityRepository,
+        DepartmentRepository departmentRepository,
+        QueueTicketRepository queueTicketRepository,
+        QueueTicketStatusHistoryRepository historyRepository,
+        StaffUserRepository staffUserRepository,
+        JdbcTemplate jdbcTemplate
+) {
+    this.patientRepository = patientRepository;
+    this.facilityRepository = facilityRepository;
+    this.departmentRepository = departmentRepository;
+    this.queueTicketRepository = queueTicketRepository;
+    this.historyRepository = historyRepository;
+    this.staffUserRepository = staffUserRepository;
+    this.jdbcTemplate = jdbcTemplate;
+}
 
     // ---------------------------------------------------------
     // STEP 1: REGISTER A PATIENT
@@ -329,26 +337,56 @@ public class QueueService {
     }
 
     private void recordStatusChange(
-            QueueTicket ticket,
-            TicketStatus previousStatus,
-            TicketStatus newStatus,
-            String notes
-    ) {
-        QueueTicketStatusHistory history =
-                new QueueTicketStatusHistory();
+        QueueTicket ticket,
+        TicketStatus previousStatus,
+        TicketStatus newStatus,
+        String notes
+) {
+    StaffUser staff = getAuthenticatedStaff();
 
-        history.setTicket(ticket);
-        history.setPreviousStatus(previousStatus);
-        history.setNewStatus(newStatus);
-        history.setChangedAt(LocalDateTime.now());
-        history.setNotes(notes);
+    QueueTicketStatusHistory history =
+            new QueueTicketStatusHistory();
 
-        // Staff attribution will be populated from the authenticated
-        // staff identity when authentication is connected to this workflow.
-        history.setChangedByStaffId(null);
+    history.setTicket(ticket);
+    history.setPreviousStatus(previousStatus);
+    history.setNewStatus(newStatus);
+    history.setChangedAt(LocalDateTime.now());
+    history.setNotes(notes);
+    history.setChangedByStaffId(staff.getId());
 
-        historyRepository.save(history);
+    historyRepository.save(history);
+}
+private StaffUser getAuthenticatedStaff() {
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    if (authentication == null
+            || !authentication.isAuthenticated()
+            || authentication.getName() == null
+            || authentication.getName().equals("anonymousUser")) {
+
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Authenticated staff identity is required"
+        );
     }
+
+    StaffUser staff = staffUserRepository
+            .findByUsername(authentication.getName())
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authenticated staff account was not found"
+            ));
+
+    if (!staff.isActive()) {
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "This staff account is inactive"
+        );
+    }
+
+    return staff;
+}
 
     private String generateTicketNumber(
             Long facilityId,
