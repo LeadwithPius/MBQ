@@ -1,16 +1,27 @@
 package com.MBQ.service;
 
-import com.MBQ.dto.TriageDtos;
-import com.MBQ.model.*;
-import com.MBQ.repository.*;
+import java.time.OffsetDateTime;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.OffsetDateTime;
-import java.util.List;
+import com.MBQ.dto.TriageDtos;
+import com.MBQ.model.ClinicalRiskAssessment;
+import com.MBQ.model.Patient;
+import com.MBQ.model.QueueTicket;
+import com.MBQ.model.StaffUser;
+import com.MBQ.model.TriageObservation;
+import com.MBQ.repository.ClinicalRiskAssessmentRepository;
+import com.MBQ.repository.PatientRepository;
+import com.MBQ.repository.QueueTicketRepository;
+import com.MBQ.repository.StaffUserRepository;
+import com.MBQ.repository.TriageObservationRepository;
 
 @Service
 public class TriageService {
@@ -50,11 +61,7 @@ public class TriageService {
         Patient patient = patients.findById(request.patientId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Patient not found"));
-
-        StaffUser staff = staffUsers.findById(request.assessedById())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Staff user not found"));
-
+        StaffUser staff = getAuthenticatedStaff();
         QueueTicket ticket = null;
 
         if (request.queueTicketId() != null) {
@@ -181,16 +188,16 @@ public class TriageService {
             Long assessmentId,
             TriageDtos.ReviewRequest request) {
 
-        if (request == null
-                || request.reviewedById() == null
-                || request.reviewStatus() == null
-                || request.clinicianNotes() == null
-                || request.clinicianNotes().isBlank()) {
+       if (request == null
+        || request.reviewStatus() == null
+        || request.clinicianNotes() == null
+        || request.clinicianNotes().isBlank()) {
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Reviewer, review status and clinician notes are required");
-        }
+    throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "Review status and clinician notes are required"
+    );
+}
 
         ClinicalRiskAssessment assessment =
                 assessments.findById(assessmentId)
@@ -198,10 +205,7 @@ public class TriageService {
                                 HttpStatus.NOT_FOUND,
                                 "Assessment not found"));
 
-        StaffUser reviewer = staffUsers.findById(request.reviewedById())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Reviewing staff user not found"));
+        StaffUser reviewer = getAuthenticatedStaff();
 
         if (request.reviewStatus()
                 == ClinicalRiskAssessment.ReviewStatus.OVERRIDDEN
@@ -231,14 +235,12 @@ public class TriageService {
     private void validate(
             TriageDtos.CreateObservationRequest request) {
 
-        if (request == null
-                || request.patientId() == null
-                || request.assessedById() == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "patientId and assessedById are required");
-        }
+       if (request == null || request.patientId() == null) {
+    throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "patientId is required"
+    );
+}
 
         if (request.systolicBp() != null
                 && request.diastolicBp() != null
@@ -330,4 +332,35 @@ public class TriageService {
                 assessment.getCreatedAt(),
                 assessment.getReviewedAt());
     }
+    private StaffUser getAuthenticatedStaff() {
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    if (authentication == null
+            || !authentication.isAuthenticated()
+            || authentication.getName() == null
+            || authentication.getName().equals("anonymousUser")) {
+
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Authenticated staff identity is required"
+        );
+    }
+
+    StaffUser staff = staffUsers
+            .findByUsername(authentication.getName())
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authenticated staff account was not found"
+            ));
+
+    if (!staff.isActive()) {
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "This staff account is inactive"
+        );
+    }
+
+    return staff;
+}
 }
