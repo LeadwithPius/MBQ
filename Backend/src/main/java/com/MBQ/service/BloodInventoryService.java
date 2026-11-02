@@ -175,6 +175,7 @@ public class BloodInventoryService {
                 .orElseThrow(() -> new IllegalStateException("Inventory operation disappeared"));
 
         int remainingToIssue = request.units();
+        int movementBalance = before;
         List<BatchAllocation> allocations = new ArrayList<>();
 
         for (BloodStockBatch batch : eligible) {
@@ -191,14 +192,15 @@ public class BloodInventoryService {
             movement.setBatch(batch);
             movement.setMovementType(BloodStockMovementType.ISSUED);
             movement.setUnitsChanged(allocated);
-            movement.setQuantityBefore(before);
-            movement.setQuantityAfter(after);
+            movement.setQuantityBefore(movementBalance);
+            movement.setQuantityAfter(movementBalance - allocated);
             movement.setReason(request.reason().trim());
             movement.setRecordedBy(actor);
             movement.setCreatedAt(LocalDateTime.now());
             movement.setRequestFingerprint(fingerprint);
             movement.setOperation(operation);
             movements.save(movement);
+            movementBalance -= allocated;
         }
 
         batches.saveAll(eligible);
