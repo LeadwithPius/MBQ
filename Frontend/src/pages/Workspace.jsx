@@ -89,10 +89,30 @@ function useDepartmentQueue() {
 
   useEffect(() => {
     if (!departmentId) return undefined;
-    void loadQueue();
-    const timer = window.setInterval(() => { void loadQueue(); }, 30000);
-    return () => window.clearInterval(timer);
-  }, [departmentId, loadQueue]);
+
+    let active = true;
+    const fetchQueue = () => {
+      api("/queue/departments/" + departmentId + "/waiting")
+        .then(data => {
+          if (!active) return;
+          setQueue(Array.isArray(data) ? data : []);
+          setError("");
+        })
+        .catch(err => {
+          if (active) setError(err.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    fetchQueue();
+    const timer = window.setInterval(fetchQueue, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [departmentId]);
 
   return {
     queue,
@@ -158,7 +178,26 @@ export function PatientsPage() {
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+
+    api("/patients")
+      .then(data => {
+        if (!active) return;
+        setPatients(Array.isArray(data) ? data : []);
+        setError("");
+      })
+      .catch(err => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
