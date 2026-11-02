@@ -2,11 +2,10 @@ package com.MBQ.service;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,7 +19,6 @@ import com.MBQ.model.TriageObservation;
 import com.MBQ.repository.ClinicalRiskAssessmentRepository;
 import com.MBQ.repository.PatientRepository;
 import com.MBQ.repository.QueueTicketRepository;
-import com.MBQ.repository.StaffUserRepository;
 import com.MBQ.repository.TriageObservationRepository;
 
 @Service
@@ -29,89 +27,84 @@ public class TriageService {
     private final TriageObservationRepository observations;
     private final ClinicalRiskAssessmentRepository assessments;
     private final PatientRepository patients;
-    private final StaffUserRepository staffUsers;
     private final QueueTicketRepository tickets;
     private final ClinicalRiskAssessmentService riskService;
     private final JdbcTemplate jdbc;
+    private final StaffAccessService staffAccess;
 
     public TriageService(
             TriageObservationRepository observations,
             ClinicalRiskAssessmentRepository assessments,
             PatientRepository patients,
-            StaffUserRepository staffUsers,
             QueueTicketRepository tickets,
             ClinicalRiskAssessmentService riskService,
-            JdbcTemplate jdbc) {
-
+            JdbcTemplate jdbc,
+            StaffAccessService staffAccess) {
         this.observations = observations;
         this.assessments = assessments;
         this.patients = patients;
-        this.staffUsers = staffUsers;
         this.tickets = tickets;
         this.riskService = riskService;
         this.jdbc = jdbc;
+        this.staffAccess = staffAccess;
     }
 
     @Transactional
     public TriageDtos.AssessmentResponse create(
             TriageDtos.CreateObservationRequest request) {
-
         validate(request);
 
         Patient patient = patients.findById(request.patientId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Patient not found"));
-        StaffUser staff = getAuthenticatedStaff();
+        staffAccess.requirePatientFacilityAccess(patient);
+
+        StaffUser staff = staffAccess.currentStaff();
         QueueTicket ticket = null;
 
         if (request.queueTicketId() != null) {
             ticket = tickets.findById(request.queueTicketId())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Queue ticket not found"));
+
+            if (!Objects.equals(ticket.getPatient().getId(), patient.getId())
+                    || ticket.getDepartment().getFacility() == null
+                    || patient.getFacility() == null
+                    || !Objects.equals(
+                            ticket.getDepartment().getFacility().getId(),
+                            patient.getFacility().getId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "The queue ticket must belong to this patient and facility");
+            }
         }
 
         TriageObservation observation = new TriageObservation();
-
         observation.setPatient(patient);
         observation.setQueueTicket(ticket);
         observation.setAssessedBy(staff);
-
         observation.setMeasuredAt(
                 request.measuredAt() == null
                         ? OffsetDateTime.now()
                         : request.measuredAt());
-
         observation.setSystolicBp(request.systolicBp());
         observation.setDiastolicBp(request.diastolicBp());
         observation.setHeartRate(request.heartRate());
         observation.setRespiratoryRate(request.respiratoryRate());
         observation.setTemperatureC(request.temperatureC());
         observation.setSpo2Percent(request.spo2Percent());
-
         observation.setSymptoms(
-                request.symptoms() == null
-                        ? ""
-                        : request.symptoms().trim());
-
-        observation.setNotes(request.notes());
+                request.symptoms() == null ? "" : request.symptoms().trim());
+        observation.setNotes(trimToNull(request.notes()));
 
         observation = observations.save(observation);
 
-        // Produce an explainable, preliminary recommendation.
         ClinicalRiskAssessmentService.RuleResult result =
                 riskService.assess(observation);
-
         ClinicalRiskAssessment assessment =
                 riskService.toAssessment(observation, result);
-
         assessment = assessments.save(assessment);
 
-        /*
-         * Escalate queue priority when the rules recommend a higher level.
-         * Never automatically downgrade an existing priority.
-         *
-         * The recommendation remains pending clinician review.
-         */
         if (ticket != null) {
             String sql = """
                 UPDATE queue_ticket
@@ -130,11 +123,7 @@ public class TriageService {
                            ELSE 0
                          END
                 """;
-
-            jdbc.update(
-                    sql,
-                    result.priority().name(),
-                    ticket.getId(),
+            jdbc.update(sql, result.priority().name(), ticket.getId(),
                     result.priority().name());
         }
 
@@ -143,25 +132,22 @@ public class TriageService {
 
     @Transactional(readOnly = true)
     public TriageDtos.ObservationResponse getObservation(Long id) {
-
         TriageObservation observation = observations.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Observation not found"));
-
+        staffAccess.requirePatientFacilityAccess(observation.getPatient());
         return toObservationResponse(observation);
     }
 
     @Transactional(readOnly = true)
     public List<TriageDtos.ObservationResponse> getPatientObservations(
             Long patientId) {
+        Patient patient = patients.findById(patientId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Patient not found"));
+        staffAccess.requirePatientFacilityAccess(patient);
 
-        if (!patients.existsById(patientId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Patient not found");
-        }
-
-        return observations
-                .findByPatient_IdOrderByMeasuredAtDesc(patientId)
+        return observations.findByPatient_IdOrderByMeasuredAtDesc(patientId)
                 .stream()
                 .map(this::toObservationResponse)
                 .toList();
@@ -170,14 +156,12 @@ public class TriageService {
     @Transactional(readOnly = true)
     public List<TriageDtos.AssessmentResponse> getAssessments(
             Long observationId) {
+        TriageObservation observation = observations.findById(observationId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Observation not found"));
+        staffAccess.requirePatientFacilityAccess(observation.getPatient());
 
-        if (!observations.existsById(observationId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Observation not found");
-        }
-
-        return assessments
-                .findByObservation_IdOrderByCreatedAtDesc(observationId)
+        return assessments.findByObservation_IdOrderByCreatedAtDesc(observationId)
                 .stream()
                 .map(this::toAssessmentResponse)
                 .toList();
@@ -187,101 +171,98 @@ public class TriageService {
     public TriageDtos.AssessmentResponse review(
             Long assessmentId,
             TriageDtos.ReviewRequest request) {
+        if (request == null
+                || request.reviewStatus() == null
+                || request.reviewStatus()
+                        == ClinicalRiskAssessment.ReviewStatus.PENDING
+                || request.clinicianNotes() == null
+                || request.clinicianNotes().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A final review decision and clinician notes are required");
+        }
 
-       if (request == null
-        || request.reviewStatus() == null
-        || request.clinicianNotes() == null
-        || request.clinicianNotes().isBlank()) {
+        ClinicalRiskAssessment assessment = assessments.findById(assessmentId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Assessment not found"));
 
-    throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Review status and clinician notes are required"
-    );
-}
+        staffAccess.requirePatientFacilityAccess(
+                assessment.getObservation().getPatient());
 
-        ClinicalRiskAssessment assessment =
-                assessments.findById(assessmentId)
-                        .orElseThrow(() -> new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Assessment not found"));
-
-        StaffUser reviewer = getAuthenticatedStaff();
+        if (assessment.getReviewStatus()
+                != ClinicalRiskAssessment.ReviewStatus.PENDING) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This assessment has already been reviewed");
+        }
 
         if (request.reviewStatus()
                 == ClinicalRiskAssessment.ReviewStatus.OVERRIDDEN
                 && request.confirmedPriority() == null) {
-
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "confirmedPriority is required when overriding a recommendation");
         }
 
+        StaffUser reviewer = staffAccess.currentStaff();
         assessment.setReviewedBy(reviewer);
         assessment.setReviewStatus(request.reviewStatus());
         assessment.setClinicianNotes(request.clinicianNotes().trim());
         assessment.setReviewedAt(OffsetDateTime.now());
 
-        if (request.reviewStatus()
-                == ClinicalRiskAssessment.ReviewStatus.OVERRIDDEN) {
-
-            assessment.setRecommendedPriority(
-                    request.confirmedPriority());
-        }
-
-        return toAssessmentResponse(
-                assessments.save(assessment));
+        // Preserve the original system recommendation. Confirmed priority
+        // will be stored separately with the clinical review-history migration.
+        return toAssessmentResponse(assessments.save(assessment));
     }
 
-    private void validate(
-            TriageDtos.CreateObservationRequest request) {
+    private void validate(TriageDtos.CreateObservationRequest request) {
+        if (request == null || request.patientId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "patientId is required");
+        }
 
-       if (request == null || request.patientId() == null) {
-    throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "patientId is required"
-    );
-}
-
+        if (request.systolicBp() != null
+                && (request.systolicBp() < 30 || request.systolicBp() > 300)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "systolicBp must be between 30 and 300");
+        }
+        if (request.diastolicBp() != null
+                && (request.diastolicBp() < 20 || request.diastolicBp() > 200)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "diastolicBp must be between 20 and 200");
+        }
         if (request.systolicBp() != null
                 && request.diastolicBp() != null
                 && request.systolicBp() <= request.diastolicBp()) {
-
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Systolic blood pressure must be greater than diastolic blood pressure");
         }
-
         if (request.temperatureC() != null
                 && (request.temperatureC().doubleValue() < 25
                 || request.temperatureC().doubleValue() > 45)) {
-
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "temperatureC must be between 25 and 45");
         }
-
         if (request.heartRate() != null
-                && (request.heartRate() < 1
-                || request.heartRate() > 300)) {
-
+                && (request.heartRate() < 1 || request.heartRate() > 300)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "heartRate must be between 1 and 300");
         }
-
         if (request.respiratoryRate() != null
                 && (request.respiratoryRate() < 1
                 || request.respiratoryRate() > 100)) {
-
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "respiratoryRate must be between 1 and 100");
         }
-
         if (request.spo2Percent() != null
                 && (request.spo2Percent() < 0
                 || request.spo2Percent() > 100)) {
-
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "spo2Percent must be between 0 and 100");
@@ -290,7 +271,6 @@ public class TriageService {
 
     private TriageDtos.ObservationResponse toObservationResponse(
             TriageObservation observation) {
-
         return new TriageDtos.ObservationResponse(
                 observation.getId(),
                 observation.getPatient().getId(),
@@ -312,10 +292,9 @@ public class TriageService {
 
     private TriageDtos.AssessmentResponse toAssessmentResponse(
             ClinicalRiskAssessment assessment) {
-
         List<String> findings =
                 assessment.getFindings() == null
-                || assessment.getFindings().isBlank()
+                        || assessment.getFindings().isBlank()
                         ? List.of()
                         : assessment.getFindings().lines().toList();
 
@@ -332,35 +311,8 @@ public class TriageService {
                 assessment.getCreatedAt(),
                 assessment.getReviewedAt());
     }
-    private StaffUser getAuthenticatedStaff() {
-    Authentication authentication =
-            SecurityContextHolder.getContext().getAuthentication();
 
-    if (authentication == null
-            || !authentication.isAuthenticated()
-            || authentication.getName() == null
-            || authentication.getName().equals("anonymousUser")) {
-
-        throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "Authenticated staff identity is required"
-        );
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
-
-    StaffUser staff = staffUsers
-            .findByUsername(authentication.getName())
-            .orElseThrow(() -> new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Authenticated staff account was not found"
-            ));
-
-    if (!staff.isActive()) {
-        throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "This staff account is inactive"
-        );
-    }
-
-    return staff;
-}
 }
