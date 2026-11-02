@@ -125,6 +125,18 @@ public class QueueService {
                 ));
 
         Long departmentFacilityId = department.getFacility().getId();
+        StaffUser currentStaff = getAuthenticatedStaff();
+        Long staffFacilityId = currentStaff.getDepartment() == null
+                || currentStaff.getDepartment().getFacility() == null
+                ? null
+                : currentStaff.getDepartment().getFacility().getId();
+
+        if (!"ADMIN".equals(currentStaff.getRole().name())
+                && !Objects.equals(staffFacilityId, departmentFacilityId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only create queue tickets within your assigned facility");
+        }
 
         if (patient.getFacility() == null
                 || !Objects.equals(
