@@ -3,14 +3,15 @@ import { Activity, ClipboardList, Droplet, LayoutDashboard, LogOut, Menu, Plus, 
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { ROLE_ACCESS } from "../roleAccess";
 
 const links = [
-  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, roles: ["ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"] },
-  { to: "/app/patients", label: "Patients", icon: Users, roles: ["ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"] },
-  { to: "/app/queue", label: "Queue management", icon: ClipboardList, roles: ["ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"] },
-  { to: "/app/triage", label: "Clinical triage", icon: Stethoscope, roles: ["ADMIN", "DOCTOR", "NURSE"] },
-  { to: "/app/blood-bank", label: "Blood bank", icon: Droplet, roles: ["ADMIN", "DOCTOR", "NURSE"] },
-  { to: "/app/reports", label: "Reports", icon: Activity, roles: ["ADMIN"] },
+  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, roles: ROLE_ACCESS.WORKSPACE },
+  { to: "/app/patients", label: "Patients", icon: Users, roles: ROLE_ACCESS.PATIENTS },
+  { to: "/app/queue", label: "Queue management", icon: ClipboardList, roles: ROLE_ACCESS.QUEUE },
+  { to: "/app/triage", label: "Clinical triage", icon: Stethoscope, roles: ROLE_ACCESS.TRIAGE },
+  { to: "/app/blood-bank", label: "Blood bank", icon: Droplet, roles: ROLE_ACCESS.BLOOD_BANK },
+  { to: "/app/reports", label: "Reports", icon: Activity, roles: ROLE_ACCESS.REPORTS },
 ];
 
 export function WorkspaceLayout() {
@@ -43,7 +44,14 @@ export function WorkspaceLayout() {
 </div>
       <span className="sidebar-caption">WORKSPACE</span>
       <nav className="workspace-nav">{visibleLinks.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={() => setMenuOpen(false)} className={({ isActive }) => "workspace-nav-link" + (isActive ? " active" : "")}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
-      <div className="sidebar-bottom"><div className="sidebar-help"><ShieldAlert size={19} /><b>Clinical responsibility</b><p>Use the system alongside your facility's approved clinical procedures.</p></div><div className="staff-profile"><span className="staff-avatar">{(staff?.name || "S").split(" ").map(part => part[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{staff?.name || "Staff member"}</b><small>{staff?.role || "STAFF"}</small></span><button onClick={() => { logout(); navigate("/login", { replace: true }); }} aria-label="Sign out"><LogOut size={17} /></button></div></div>
+      <div className="sidebar-bottom"><div className="sidebar-help"><ShieldAlert size={19} /><b>Clinical responsibility</b><p>Use the system alongside your facility's approved clinical procedures.</p></div><div className="staff-profile">
+        <span className="staff-avatar">{(staff?.name || "S").split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase()}</span>
+        <span className="staff-profile-details">
+          <b>{staff?.name || "Staff member"}</b>
+          <small><span className="profile-status-dot" />{staff?.role || "STAFF"}</small>
+        </span>
+        <button className="staff-signout" onClick={() => { logout(); navigate("/login", { replace: true }); }} aria-label="Sign out" title="Sign out"><LogOut size={18} /></button>
+      </div></div>
     </aside>
     <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations"}</b></div><div className="topbar-user"><span className="status-pip" /> Secure staff session <span className="topbar-role">{staff?.role}</span></div></header><div className="workspace-content"><Outlet /></div></main>
   </div>;
