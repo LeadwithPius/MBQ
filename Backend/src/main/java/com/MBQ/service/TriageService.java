@@ -182,7 +182,8 @@ public class TriageService {
                     "A final review decision and clinician notes are required");
         }
 
-        ClinicalRiskAssessment assessment = assessments.findById(assessmentId)
+        // Pessimistic row lock makes the pending -> final transition atomic.
+        ClinicalRiskAssessment assessment = assessments.findByIdForUpdate(assessmentId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Assessment not found"));
 
@@ -196,23 +197,54 @@ public class TriageService {
                     "This assessment has already been reviewed");
         }
 
-        if (request.reviewStatus()
-                == ClinicalRiskAssessment.ReviewStatus.OVERRIDDEN
-                && request.confirmedPriority() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "confirmedPriority is required when overriding a recommendation");
+        PriorityLevel confirmedPriority = request.confirmedPriority();
+        if (request.reviewStatus() == ClinicalRiskAssessment.ReviewStatus.CONFIRMED) {
+            if (confirmedPriority != null
+                    && confirmedPriority != assessment.getRecommendedPriority()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "A changed priority must be submitted as OVERRIDDEN");
+            }
+            confirmedPriority = assessment.getRecommendedPriority();
+        } else {
+            if (confirmedPriority == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "confirmedPriority is required when overriding a recommendation");
+            }
+            if (confirmedPriority == assessment.getRecommendedPriority()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Use CONFIRMED when keeping the recommended priority");
+            }
         }
 
         StaffUser reviewer = staffAccess.currentStaff();
+        OffsetDateTime reviewedAt = OffsetDateTime.now();
         assessment.setReviewedBy(reviewer);
         assessment.setReviewStatus(request.reviewStatus());
+        assessment.setConfirmedPriority(confirmedPriority);
         assessment.setClinicianNotes(request.clinicianNotes().trim());
-        assessment.setReviewedAt(OffsetDateTime.now());
+        assessment.setReviewedAt(reviewedAt);
 
-        // Preserve the original system recommendation. Confirmed priority
-        // will be stored separately with the clinical review-history migration.
-        return toAssessmentResponse(assessments.save(assessment));
+        // Persist the final decision and immutable audit snapshot in one transaction.
+        ClinicalRiskAssessment saved = assessments.save(assessment);
+        jdbc.update("""
+            INSERT INTO clinical_risk_review_history (
+                assessment_id, reviewed_by_id, review_status,
+                recommended_priority_snapshot, confirmed_priority,
+                clinician_notes, reviewed_at, is_legacy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+            """,
+            saved.getId(),
+            reviewer.getId(),
+            saved.getReviewStatus().name(),
+            saved.getRecommendedPriority().name(),
+            saved.getConfirmedPriority().name(),
+            saved.getClinicianNotes(),
+            reviewedAt);
+
+        return toAssessmentResponse(saved);
     }
 
     private void validate(TriageDtos.CreateObservationRequest request) {
@@ -307,6 +339,7 @@ public class TriageService {
                 assessment.getModelVersion(),
                 assessment.isClinicianReviewRequired(),
                 assessment.getReviewStatus(),
+                assessment.getConfirmedPriority(),
                 assessment.getClinicianNotes(),
                 assessment.getCreatedAt(),
                 assessment.getReviewedAt());
