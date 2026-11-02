@@ -73,6 +73,19 @@ public class QueueService {
     public PatientResponse registerPatient(
             PatientRegistrationRequest request
     ) {
+        StaffUser currentStaff = getAuthenticatedStaff();
+        Long staffFacilityId = currentStaff.getDepartment() == null
+                || currentStaff.getDepartment().getFacility() == null
+                ? null
+                : currentStaff.getDepartment().getFacility().getId();
+
+        if (!"ADMIN".equals(currentStaff.getRole().name())
+                && !Objects.equals(staffFacilityId, request.facilityId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only register patients at your assigned facility");
+        }
+
         Facility facility = facilityRepository.findById(request.facilityId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
