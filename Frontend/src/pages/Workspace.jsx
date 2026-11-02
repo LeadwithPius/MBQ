@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Bell, ClipboardList, Droplet, LayoutDashboard, LogOut, Menu, Plus, Search, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
+import { Activity, ClipboardList, Droplet, LayoutDashboard, LogOut, Menu, Plus, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -88,7 +88,7 @@ export function QueuePage() {
     catch (err) { setMessage(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={<button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button>} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} onComplete={staff?.role === "ADMIN" || staff?.role === "DOCTOR" ? complete : null} /></section></>;
+  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={{(staff?.role === "ADMIN" || staff?.role === "DOCTOR") && <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button>}} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} onComplete={staff?.role === "ADMIN" || staff?.role === "DOCTOR" ? complete : null} /></section></>;
 }
 
 export function PatientsPage() {
@@ -98,7 +98,7 @@ export function PatientsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", age: "", sex: "", contact: "", bloodGroup: "" });
+  const [form, setForm] = useState({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
   const load = useCallback(async () => {
     setLoading(true);
     try { const data = await api("/patients"); setPatients(Array.isArray(data) ? data : []); setError(""); }
@@ -109,18 +109,18 @@ export function PatientsPage() {
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
-      const patient = await api("/patients", { method: "POST", body: { ...form, age: form.age === "" ? null : Number(form.age), bloodGroup: form.bloodGroup || null, facilityId: staff?.facilityId } });
+      const patient = await api("/patients", { method: "POST", body: { ...form, age: form.age === "" ? null : Number(form.age), bloodGroup: form.bloodGroup || null, facilityId: Number(form.facilityId || staff?.facilityId) } });
       try {
         if (!staff?.departmentId) throw new Error("Patient registered, but no department is assigned to your account, so a queue ticket was not created.");
         await api("/queue/tickets", { method: "POST", body: { patientId: patient.id, departmentId: staff.departmentId, priorityLevel: "NORMAL", requiresBlood: false } });
         setNotice("Patient registered and added to your department queue.");
       } catch (ticketError) { setNotice("Patient registered successfully. Queue ticket not created: " + ticketError.message); }
-      setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "" });
+      setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
       await load();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column"><section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details</p></div></div><form className="form-grid" onSubmit={submit}><label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}<button className="button button-primary span-two" disabled={busy || !staff?.facilityId}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div className="patient-list-row" key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
+  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column">{(["ADMIN", "RECEPTIONIST"].includes(staff?.role)) ? <section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details</p></div></div><form className="form-grid" onSubmit={submit}>{staff?.role === "ADMIN" && !staff?.facilityId && <label className="span-two">Facility ID<input type="number" min="1" required value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })} /></label>}<label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}<button className="button button-primary span-two" disabled={busy || !(form.facilityId || staff?.facilityId)}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section> : <section className="panel"><div className="empty-panel">Your staff role does not have permission to register patients. You can still view your facility's patient directory.</div></section>}<section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div className="patient-list-row" key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
 }
 
 export function TriagePage() {
