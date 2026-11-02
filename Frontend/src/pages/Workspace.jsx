@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, ClipboardList, Droplet, LayoutDashboard, LogOut, Menu, Plus, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownUp, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
@@ -17,6 +17,7 @@ const links = [
 export function WorkspaceLayout() {
   const { staff, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const navigate = useNavigate();
   const visibleLinks = links.filter(item => item.roles.includes(staff?.role));
   return <div className="workspace">
@@ -48,12 +49,13 @@ export function WorkspaceLayout() {
         <span className="staff-avatar">{(staff?.name || "S").split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase()}</span>
         <span className="staff-profile-details">
           <b>{staff?.name || "Staff member"}</b>
-          <small><span className="profile-status-dot" />{staff?.role || "STAFF"}</small>
+          <small>{staff?.role || "STAFF"}</small>
         </span>
-        <button className="staff-signout" onClick={() => { logout(); navigate("/login", { replace: true }); }} aria-label="Sign out" title="Sign out"><LogOut size={18} /></button>
+        <button className="staff-signout" onClick={() => setConfirmLogout(true)} aria-label="Sign out" title="Sign out"><LogOut size={18} /></button>
+        {confirmLogout && <div className="logout-confirm" role="dialog" aria-label="Confirm sign out"><span>Sign out of this workstation?</span><button onClick={() => setConfirmLogout(false)}>Stay</button><button onClick={() => { logout(); navigate("/login", { replace: true }); }}>Sign out</button></div>}
       </div></div>
     </aside>
-    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations"}</b></div><div className="topbar-user"><span className="status-pip" /> Secure staff session <span className="topbar-role">{staff?.role}</span></div></header><div className="workspace-content"><Outlet /></div></main>
+    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations"}</b></div><div className="topbar-user"><span className="status-pip" /> {staff?.name || "Staff workspace"} <span className="topbar-role">{staff?.role || "STAFF"}</span></div></header><div className="workspace-content"><Outlet /></div></main>
   </div>;
 }
 
@@ -67,13 +69,16 @@ function useDepartmentQueue() {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(Boolean(departmentId));
   const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadQueue = useCallback(async () => {
+  const loadQueue = useCallback(async ({ showLoading = false } = {}) => {
     if (!departmentId) return;
+    if (showLoading) setLoading(true);
     try {
       const data = await api("/queue/departments/" + departmentId + "/waiting");
       setQueue(Array.isArray(data) ? data : []);
       setError("");
+      setLastUpdated(Date.now());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -81,15 +86,10 @@ function useDepartmentQueue() {
     }
   }, [departmentId]);
 
-  const refresh = useCallback(async () => {
-    if (!departmentId) return;
-    setLoading(true);
-    await loadQueue();
-  }, [departmentId, loadQueue]);
+  const refresh = useCallback(() => loadQueue(), [loadQueue]);
 
   useEffect(() => {
     if (!departmentId) return undefined;
-
     let active = true;
     const fetchQueue = () => {
       api("/queue/departments/" + departmentId + "/waiting")
@@ -97,52 +97,135 @@ function useDepartmentQueue() {
           if (!active) return;
           setQueue(Array.isArray(data) ? data : []);
           setError("");
+          setLastUpdated(Date.now());
         })
-        .catch(err => {
-          if (active) setError(err.message);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
-        });
+        .catch(err => { if (active) setError(err.message); })
+        .finally(() => { if (active) setLoading(false); });
     };
-
     fetchQueue();
     const timer = window.setInterval(fetchQueue, 30000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
+    return () => { active = false; window.clearInterval(timer); };
   }, [departmentId]);
 
   return {
-    queue,
-    loading,
+    queue, loading,
     error: departmentId ? error : "Your staff account is not assigned to a department.",
-    refresh,
-    departmentId,
+    refresh, departmentId, lastUpdated,
   };
+}
+
+function useElapsedClock() {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return now;
+}
+
+function relativeAge(timestamp, now) {
+  if (!timestamp) return "Not updated yet";
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (seconds < 5) return "Updated just now";
+  if (seconds < 60) return "Updated " + seconds + "s ago";
+  const minutes = Math.floor(seconds / 60);
+  return "Updated " + minutes + "m ago";
+}
+
+function waitMinutes(timeIssued, now) {
+  if (!timeIssued) return null;
+  const parsed = new Date(timeIssued).getTime();
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.floor((now - parsed) / 60000));
+}
+
+function orderedQueue(rows, sortBy = "priority") {
+  return [...rows].sort((a, b) => {
+    if (sortBy === "wait") return (new Date(a.timeIssued) - new Date(b.timeIssued));
+    if (sortBy === "patient") return String(a.patientName || "").localeCompare(String(b.patientName || ""));
+    const rank = { EMERGENCY: 0, URGENT: 1, NORMAL: 2 };
+    return (rank[a.priorityLevel] ?? 3) - (rank[b.priorityLevel] ?? 3)
+      || (new Date(a.timeIssued) - new Date(b.timeIssued));
+  });
 }
 
 export function DashboardPage() {
   const { staff } = useAuth();
-  const { queue, loading, error, refresh } = useDepartmentQueue();
+  const navigate = useNavigate();
+  const { queue, loading, error, refresh, lastUpdated } = useDepartmentQueue();
+  const now = useElapsedClock();
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("priority");
+  const canCallNext = ["ADMIN", "DOCTOR"].includes(staff?.role);
   const emergency = queue.filter(item => item.priorityLevel === "EMERGENCY").length;
   const urgent = queue.filter(item => item.priorityLevel === "URGENT").length;
-  return <><PageHeading title="Hospital operations" description={"Welcome, " + (staff?.name || "staff member") + ". Here is the current department queue."} action={<button className="button button-outline" onClick={refresh}>Refresh queue</button>} />
+  const longestWait = queue.reduce((max, item) => Math.max(max, waitMinutes(item.timeIssued, now) ?? 0), 0);
+  const visibleRows = orderedQueue(queue.filter(item => priorityFilter === "ALL" || item.priorityLevel === priorityFilter), sortBy);
+
+  async function callNext() {
+    if (!staff?.departmentId || busy) return;
+    setBusy(true);
+    setNotice("");
+    try {
+      const called = await api("/queue/departments/" + staff.departmentId + "/call-next", { method: "POST" });
+      setNotice(called?.patientName ? called.patientName + " has been called." : "The next patient has been called.");
+      await refresh();
+    } catch (err) {
+      setNotice(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <>
+    <PageHeading eyebrow="WORKSPACE" title="Overview" description={"Good to see you, " + (staff?.name || "staff member") + ". Here is your department's live queue."} action={<div className="dashboard-heading-actions"><span className="updated-label"><span className="status-pip" />{relativeAge(lastUpdated, now)}</span><button className="button button-outline" onClick={refresh} disabled={loading} aria-label="Refresh queue"><RefreshCw size={16} /> Refresh</button></div>} />
     {error && <div className="notice notice-warning">{error}</div>}
-    <div className="stat-grid"><Stat label="Patients waiting" value={loading ? "—" : queue.length} icon={Users} /><Stat label="Emergency priority" value={loading ? "—" : emergency} icon={ShieldAlert} tone="red" /><Stat label="Urgent priority" value={loading ? "—" : urgent} icon={Activity} tone="amber" /><Stat label="Department" value={staff?.departmentId || "Not assigned"} icon={ClipboardList} /></div>
-    <section className="panel"><div className="panel-heading"><div><h2>Waiting queue</h2><p>Live data from your assigned department</p></div><span className="live-label"><span className="status-pip" /> Auto-refresh 30s</span></div><QueueTable rows={queue.slice(0,6)} loading={loading} /></section>
+    {notice && <div className="notice">{notice}</div>}
+    <div className="dashboard-primary-action">
+      <div><span className="eyebrow">DEPARTMENT QUEUE</span><strong>{queue.length} waiting patient{queue.length === 1 ? "" : "s"}</strong><small>{staff?.departmentName || (staff?.departmentId ? "Department " + staff.departmentId : "Department not assigned")}</small></div>
+      <button className="button button-primary" onClick={callNext} disabled={!canCallNext || busy || loading || queue.length === 0}><Users size={17} />{busy ? "Calling…" : "Call next patient"}</button>
+    </div>
+    <div className="stat-grid dashboard-stat-grid">
+      <Stat label="Patients waiting" value={loading ? "—" : queue.length} icon={Users} />
+      <Stat label="Emergency waiting" value={loading ? "—" : emergency} icon={AlertTriangle} tone={emergency ? "red alert-active" : "red"} />
+      <Stat label="Urgent waiting" value={loading ? "—" : urgent} icon={Activity} tone={urgent ? "amber alert-active" : "amber"} />
+      <Stat label="Longest wait" value={loading ? "—" : longestWait + " min"} icon={Clock3} />
+    </div>
+    <section className="panel dashboard-queue-panel">
+      <div className="panel-heading dashboard-queue-heading"><div><h2>Waiting queue</h2><p>Prioritised by clinical urgency, then waiting time</p></div><div className="queue-controls"><label>Priority <select value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)}><option value="ALL">All priorities</option><option value="EMERGENCY">Emergency</option><option value="URGENT">Urgent</option><option value="NORMAL">Normal</option></select></label><label>Sort by <select value={sortBy} onChange={event => setSortBy(event.target.value)}><option value="priority">Priority & wait</option><option value="wait">Longest waiting</option><option value="patient">Patient name</option></select></label></div></div>
+      <QueueTable rows={visibleRows} loading={loading} now={now} onPatient={row => navigate("/app/patients?patientId=" + row.patientId)} />
+    </section>
+    <section className="dashboard-lower-grid">
+      <article className="panel dashboard-info-panel"><div className="panel-heading"><div><h2>Queue attention</h2><p>Operational items requiring awareness</p></div><ShieldAlert size={19} /></div>{emergency > 0 ? <p className="attention-message emergency-message"><AlertTriangle size={17} /> {emergency} emergency-priority patient{emergency === 1 ? "" : "s"} waiting. Review immediately under facility protocol.</p> : <p className="attention-message"><CheckCircle2 size={17} /> No emergency-priority patients currently waiting.</p>}{urgent > 0 && <p className="attention-message urgent-message"><AlertTriangle size={17} /> {urgent} urgent-priority patient{urgent === 1 ? "" : "s"} waiting.</p>}</article>
+      <article className="panel dashboard-info-panel"><div className="panel-heading"><div><h2>Workspace details</h2><p>Current staff session</p></div><ClipboardList size={19} /></div><dl className="workspace-details"><div><dt>Staff member</dt><dd>{staff?.name || "Not available"}</dd></div><div><dt>Role</dt><dd>{staff?.role || "Not available"}</dd></div><div><dt>Department</dt><dd>{staff?.departmentName || (staff?.departmentId ? "Department " + staff.departmentId : "Not assigned")}</dd></div></dl></article>
+    </section>
   </>;
 }
 
 function Stat({ label, value, icon: Icon, tone = "blue" }) {
-  return <article className="stat-card"><span className={"stat-icon " + tone}><Icon size={20} /></span><div><small>{label}</small><strong>{value}</strong></div></article>;
+  return <article className={"stat-card " + (tone.includes("alert-active") ? "stat-alert-active" : "")}><span className={"stat-icon " + tone}><Icon size={20} /></span><div><small>{label}</small><strong>{value}</strong></div></article>;
 }
 
-function QueueTable({ rows, loading, onCall, onComplete }) {
-  if (loading) return <div className="empty-panel">Loading queue records…</div>;
-  if (!rows.length) return <div className="empty-panel">No patients are currently waiting in this department.</div>;
-  return <div className="table-wrap"><table className="data-table"><thead><tr><th>Ticket</th><th>Patient</th><th>Priority</th><th>Received</th><th>Status</th>{(onCall || onComplete) && <th>Action</th>}</tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><b>{row.ticketNumber}</b></td><td>{row.patientName}</td><td><span className={"pill priority-" + String(row.priorityLevel).toLowerCase()}>{row.priorityLevel}</span></td><td>{row.timeIssued ? new Date(row.timeIssued).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td><span className="pill status-waiting">{row.status}</span></td><td>{onCall && <button className="table-action" onClick={() => onCall(row)}>Call next</button>}{onComplete && <button className="table-action" onClick={() => onComplete(row)}>Complete</button>}</td></tr>)}</tbody></table></div>;
+function PriorityBadge({ priority }) {
+  const config = {
+    EMERGENCY: { icon: AlertTriangle, label: "Emergency", className: "priority-emergency" },
+    URGENT: { icon: AlertTriangle, label: "Urgent", className: "priority-urgent" },
+    NORMAL: { icon: CheckCircle2, label: "Normal", className: "priority-normal" },
+  }[priority] || { icon: ClipboardList, label: priority || "Unassigned", className: "priority-normal" };
+  const Icon = config.icon;
+  return <span className={"pill priority-badge " + config.className}><Icon size={13} aria-hidden="true" />{config.label}</span>;
+}
+
+function QueueTable({ rows, loading, now = Date.now(), onPatient, onComplete }) {
+  if (loading && !rows.length) return <div className="queue-skeleton" aria-label="Loading queue">{[1,2,3,4].map(item => <div className="skeleton-row" key={item}><i /><i /><i /><i /></div>)}</div>;
+  if (!rows.length) return <div className="queue-empty-state"><span><ClipboardList size={24} /></span><h3>No patients waiting</h3><p>New queue tickets will appear here when patients are registered.</p></div>;
+  return <div className="table-wrap"><table className="data-table dashboard-queue-table"><thead><tr><th>Ticket</th><th>Patient</th><th>Priority</th><th>Waiting</th><th>Status</th><th>Open</th></tr></thead><tbody>{rows.map(row => {
+    const minutes = waitMinutes(row.timeIssued, now);
+    const waitTone = minutes === null ? "" : minutes >= 30 ? "wait-critical" : minutes >= 15 ? "wait-warning" : "wait-normal";
+    return <tr key={row.id} className="queue-data-row"><td><b>{row.ticketNumber}</b></td><td><button className="patient-row-link" onClick={() => onPatient?.(row)}>{row.patientName || "Patient record"}</button><small className="queue-patient-id">Patient #{row.patientId}</small></td><td><PriorityBadge priority={row.priorityLevel} /></td><td><span className={"wait-time " + waitTone}>{minutes === null ? "—" : "Waiting " + minutes + " min"}</span></td><td><span className={"pill queue-status status-" + String(row.status).toLowerCase()}>{row.status?.replace("_", " ")}</span></td><td><button className="table-action" onClick={() => onPatient?.(row)}>View patient</button></td></tr>;
+  })}</tbody></table></div>;
 }
 
 export function QueuePage() {
