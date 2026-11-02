@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 const features = [
   {
     icon: Users,
@@ -216,7 +218,7 @@ export default function LandingPage() {
         </Link>
 
         <span>
-          © {new Date().getFullYear()} MBQ. Manage · Care · Serve.
+          © {CURRENT_YEAR} MBQ. Manage · Care · Serve.
         </span>
       </footer>
     </main>
