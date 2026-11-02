@@ -1,0 +1,65 @@
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+const SESSION_KEY = "mbq.session";
+
+export function readSession() {
+  try {
+    const value = sessionStorage.getItem(SESSION_KEY);
+    if (!value) return null;
+    const session = JSON.parse(value);
+    if (!session?.accessToken || !session?.expiresAt || Date.now() >= session.expiresAt) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
+export function saveSession(session) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+export async function api(path, options = {}) {
+  const session = readSession();
+  const headers = new Headers(options.headers || {});
+  if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  if (options.auth !== false && session?.accessToken) headers.set("Authorization", "Bearer " + session.accessToken);
+
+  let response;
+  try {
+    response = await fetch(API_BASE + path, {
+      ...options,
+      headers,
+      body: options.body && typeof options.body !== "string" && !(options.body instanceof FormData)
+        ? JSON.stringify(options.body)
+        : options.body,
+    });
+  } catch {
+    throw new Error("Unable to reach the MBQ server. Check that the backend is running.");
+  }
+
+  if (response.status === 401 && options.auth !== false) {
+    clearSession();
+    window.dispatchEvent(new Event("mbq:unauthorized"));
+  }
+
+  if (response.status === 204) return null;
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const message = typeof payload === "string"
+      ? payload
+      : payload?.detail || payload?.message || payload?.error || "Request failed (" + response.status + ")";
+    throw new Error(message);
+  }
+  return payload;
+}
