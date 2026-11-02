@@ -1,8 +1,12 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   ClipboardList,
+  Clock3,
   Droplet,
+  FileBarChart,
+  FileText,
   ShieldCheck,
   Stethoscope,
   Users,
@@ -11,30 +15,73 @@ import { Link } from "react-router-dom";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-const features = [
+const problems = [
   {
-    icon: Users,
-    title: "Patient management",
-    description:
-      "Register patients and maintain organised patient records.",
+    icon: Clock3,
+    title: "Queues without visibility",
+    description: "Patients wait without a clear view of their position or what comes next.",
   },
   {
+    icon: FileText,
+    title: "Paper-heavy intake",
+    description: "Staff time is lost rewriting details and searching through paper records.",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Blood shortages found late",
+    description: "Stock by blood group can be difficult to confirm quickly when every minute matters.",
+  },
+];
+
+const modules = [
+  {
     icon: ClipboardList,
-    title: "Queue coordination",
+    title: "Queues",
+    benefit: "See who is waiting, in order.",
     description:
-      "Coordinate waiting patients and improve department workflow.",
+      "Digital patient registration creates timestamped queue tickets assigned to a department. Staff can monitor the live queue and call the next patient.",
   },
   {
     icon: Stethoscope,
-    title: "Clinical triage",
+    title: "Triage",
+    benefit: "Get urgent cases seen first.",
     description:
-      "Record observations and support clinical review.",
+      "Nurses can record observations, flag urgent or emergency cases, and capture triage notes to support prioritisation.",
   },
   {
     icon: Droplet,
-    title: "Blood bank",
+    title: "Blood Bank",
+    benefit: "Know your stock before you need it.",
     description:
-      "Support blood-stock visibility and resource management.",
+      "Track units by blood group, set low-stock thresholds, and keep a record of donor alerts when stock is insufficient for an urgent request.",
+  },
+];
+
+const workflow = [
+  {
+    number: "01",
+    title: "Register",
+    description: "The receptionist records the patient and a timestamped queue ticket is issued.",
+  },
+  {
+    number: "02",
+    title: "Queue",
+    description: "The patient's position appears on the department's live dashboard.",
+  },
+  {
+    number: "03",
+    title: "Triage",
+    description: "The nurse records observations and flags emergencies for immediate attention.",
+  },
+  {
+    number: "04",
+    title: "Coordinate blood",
+    description: "If blood is needed, the blood bank checks availability. If stock is insufficient, a donor alert can be logged.",
+  },
+  {
+    number: "05",
+    title: "Consult and close",
+    description: "The doctor records the outcome before the patient is discharged or referred.",
   },
 ];
 
@@ -50,8 +97,8 @@ export default function LandingPage() {
           </span>
         </Link>
 
-        <nav>
-          <a href="#features">Platform</a>
+        <nav aria-label="Main navigation">
+          <a href="#platform">Platform</a>
           <a href="#workflow">How it works</a>
           <a href="#about">About</a>
         </nav>
@@ -77,18 +124,16 @@ export default function LandingPage() {
           </h1>
 
           <p>
-            A connected hospital operations platform bringing patient
-            registration, queue coordination and clinical triage into
-            one organised workspace.
+            Bring patient intake, department queues, clinical triage and blood
+            stock coordination into one organised hospital workspace.
           </p>
 
           <div className="mbq-hero-actions">
             <Link className="mbq-primary-button" to="/login">
               Access staff portal <ArrowRight size={18} />
             </Link>
-
-            <a className="mbq-secondary-link" href="#features">
-              Explore MBQ
+            <a className="mbq-secondary-link" href="#platform">
+              Explore the platform
             </a>
           </div>
 
@@ -98,12 +143,11 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="mbq-hero-art">
+        <div className="mbq-hero-art" aria-label="MBQ Healthcare platform">
           <div className="mbq-hero-ring" />
           <div className="mbq-hero-logo-card">
-            <img src="/mbq-logo.png" alt="MBQ Healthcare eagle emblem" />
+            <img src="/mbq-logo.png" alt="MBQ Healthcare emblem" />
           </div>
-
           <div className="mbq-hero-caption">
             <span className="mbq-caption-pulse" />
             <div>
@@ -114,82 +158,79 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mbq-brand-strip">
-        <div>
-          <Users size={25} />
-          <span>QUEUES</span>
-        </div>
-        <i />
-        <div>
-          <Activity size={25} />
-          <span>TRIAGE</span>
-        </div>
-        <i />
-        <div>
-          <Droplet size={25} />
-          <span>BLOOD BANK</span>
+      <section className="mbq-problem-section" aria-labelledby="problem-title">
+        <div className="mbq-content-width">
+          <div className="mbq-problem-intro">
+            <span className="mbq-section-label"><span />THE CHALLENGE</span>
+            <h2 id="problem-title">Built for the front desk, not just the filing cabinet.</h2>
+            <p>
+              Patient intake in many public hospitals still relies on paper
+              registers, while blood stock may only be counted periodically.
+              That can mean long, unpredictable queues and slower responses
+              when a patient urgently needs blood. MBQ brings these essential
+              workflows into one coordinated workspace.
+            </p>
+          </div>
+          <div className="mbq-problem-grid">
+            {problems.map(({ icon: Icon, title, description }) => (
+              <article className="mbq-problem-card" key={title}>
+                <span className="mbq-problem-icon"><Icon size={21} /></span>
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="feature-section mbq-features" id="features">
+      <section className="feature-section mbq-features" id="platform">
         <div className="section-intro">
-          <span className="mbq-section-label">
-            <span />
-            THE MBQ PLATFORM
-          </span>
-
-          <h2>
-            Essential workflows.
-            <br />
-            One connected platform.
-          </h2>
-
+          <span className="mbq-section-label"><span />THE MBQ PLATFORM</span>
+          <h2>Three essential workflows.<br />One connected platform.</h2>
           <p>
-            Give hospital teams a consistent place to coordinate
-            essential operational tasks.
+            Give hospital teams a shared view of patient flow, clinical
+            priorities and blood stock coordination.
           </p>
         </div>
 
-        <div className="feature-grid">
-          {features.map(({ icon: Icon, title, description }) => (
-            <article className="feature-card mbq-feature-card" key={title}>
-              <span className="mbq-feature-icon">
-                <Icon size={23} />
-              </span>
-
+        <div className="mbq-module-grid">
+          {modules.map(({ icon: Icon, title, benefit, description }, index) => (
+            <article className="feature-card mbq-feature-card mbq-module-card" key={title}>
+              <span className="mbq-feature-icon"><Icon size={23} /></span>
+              <span className="mbq-module-number">0{index + 1}</span>
               <h3>{title}</h3>
+              <strong>{benefit}</strong>
               <p>{description}</p>
             </article>
           ))}
         </div>
+
+        <article className="mbq-reports-card">
+          <span className="mbq-reports-icon"><FileBarChart size={21} /></span>
+          <div>
+            <h3>Reports for administrators</h3>
+            <p>Review daily patient volumes and blood-stock movements to support operational oversight.</p>
+          </div>
+        </article>
       </section>
 
       <section className="workflow-section mbq-workflow" id="workflow">
-        <span className="mbq-section-label">
-          <span />
-          A CONNECTED WORKFLOW
-        </span>
+        <div className="mbq-workflow-intro">
+          <span className="mbq-section-label"><span />HOW IT WORKS</span>
+          <h2>From reception to clinical review.</h2>
+          <p>A coordinated journey that helps each team understand what needs to happen next.</p>
+        </div>
 
-        <h2>From reception to clinical review.</h2>
-
-        <div className="workflow-steps">
-          <div>
-            <b>01</b>
-            <h3>Register</h3>
-            <p>Capture patient details and establish the patient record.</p>
-          </div>
-
-          <div>
-            <b>02</b>
-            <h3>Coordinate</h3>
-            <p>Manage department queues and coordinate patient flow.</p>
-          </div>
-
-          <div>
-            <b>03</b>
-            <h3>Assess</h3>
-            <p>Record clinical observations and review assessments.</p>
-          </div>
+        <div className="mbq-workflow-steps">
+          {workflow.map(({ number, title, description }) => (
+            <article className="mbq-workflow-step" key={number}>
+              <span className="mbq-step-number">{number}</span>
+              <div className="mbq-step-content">
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -197,12 +238,8 @@ export default function LandingPage() {
         <div>
           <span>MBQ HOSPITAL OPERATIONS</span>
           <h2>Manage. Care. Serve.</h2>
-          <p>
-            Access your hospital workspace using your authorised
-            staff account.
-          </p>
+          <p>Access your hospital workspace using your authorised staff account.</p>
         </div>
-
         <Link to="/login">
           Staff sign in <ArrowRight size={18} />
         </Link>
@@ -216,10 +253,7 @@ export default function LandingPage() {
             <small>Hospital Operations</small>
           </span>
         </Link>
-
-        <span>
-          © {CURRENT_YEAR} MBQ. Manage · Care · Serve.
-        </span>
+        <span>© {CURRENT_YEAR} MBQ. Manage · Care · Serve.</span>
       </footer>
     </main>
   );
