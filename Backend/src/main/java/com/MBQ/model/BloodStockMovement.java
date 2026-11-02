@@ -66,4 +66,8 @@ public class BloodStockMovement {
 
     @Column(name = "transfer_id")
     private UUID transferId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operation_id")
+    private BloodInventoryOperation operation;
 }
