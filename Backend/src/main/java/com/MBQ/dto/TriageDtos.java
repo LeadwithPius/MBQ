@@ -23,7 +23,7 @@ public final class TriageDtos {
     public record AssessmentResponse(
         Long id, Long observationId, PriorityLevel recommendedPriority, List<String> findings,
         String assessmentSource, String modelVersion, boolean clinicianReviewRequired,
-        ClinicalRiskAssessment.ReviewStatus reviewStatus, String clinicianNotes,
+        ClinicalRiskAssessment.ReviewStatus reviewStatus, PriorityLevel confirmedPriority, String clinicianNotes,
         OffsetDateTime createdAt, OffsetDateTime reviewedAt) {}
 
     public record ReviewRequest(
