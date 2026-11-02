@@ -967,3 +967,129 @@
     font-size: 8px;
   }
 }
+
+/* ==========================================================
+   READABILITY + GLASS STAFF PROFILE
+   ========================================================== */
+.workspace {
+  --workspace-text: #20352b;
+  --workspace-muted: #607468;
+}
+.workspace-sidebar {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(34, 130, 83, .34), transparent 34%),
+    linear-gradient(160deg, #063d29 0%, #032f20 55%, #022719 100%);
+}
+.workspace-nav-link {
+  min-height: 48px;
+  font-size: 14px;
+  letter-spacing: .05px;
+}
+.workspace-nav-link svg { width: 19px; height: 19px; }
+.sidebar-caption { font-size: 11px; }
+.sidebar-help b { font-size: 13px; }
+.sidebar-help p { font-size: 12px; line-height: 1.65; }
+.staff-profile {
+  position: relative;
+  gap: 11px;
+  min-height: 72px;
+  margin-top: 15px;
+  padding: 11px 10px;
+  border: 1px solid rgba(255,255,255,.17);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.055));
+  box-shadow: 0 10px 30px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.13);
+  -webkit-backdrop-filter: blur(22px) saturate(1.55);
+  backdrop-filter: blur(22px) saturate(1.55);
+}
+.staff-avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 1px solid rgba(255,255,255,.32);
+  background: linear-gradient(145deg, rgba(255,255,255,.32), rgba(255,255,255,.12));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2);
+  font-size: 13px;
+}
+.staff-profile-details { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.staff-profile-details b {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.staff-profile-details small {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(238,249,242,.82);
+  font-size: 11px;
+  letter-spacing: .5px;
+}
+.profile-status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #69e5a7;
+  box-shadow: 0 0 0 3px rgba(105,229,167,.15);
+}
+.staff-profile .staff-signout {
+  width: 36px; height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 11px;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.9);
+  transition: background .18s ease, transform .18s ease;
+}
+.staff-profile .staff-signout:hover {
+  background: rgba(255,255,255,.18);
+  transform: translateY(-1px);
+}
+.workspace-content { font-size: 14px; }
+.page-title-row h1 { font-size: clamp(28px, 2.2vw, 34px); }
+.page-title-row p { font-size: 14px; line-height: 1.65; color: #64766b; }
+.eyebrow { font-size: 11px; }
+.panel-heading h2 { font-size: 17px; }
+.panel-heading p { font-size: 12px; color: #687b70; }
+.stat-card small { font-size: 12px; color: #64766b; }
+.stat-card strong { font-size: 26px; }
+.data-table th { font-size: 11px; }
+.data-table td { font-size: 13px; }
+.pill { font-size: 11px; }
+.button { min-height: 46px; font-size: 13px; }
+.form-grid label, .lookup-form label, .review-controls label { font-size: 13px; }
+.form-grid input, .form-grid select, .form-grid textarea,
+.lookup-form input, .review-controls textarea, .review-controls select { min-height: 46px; font-size: 14px; }
+.empty-panel { font-size: 13px; }
+.notice, .form-error { font-size: 13px; }
+.patient-list-row b { font-size: 13px; }
+.patient-list-row small { font-size: 11px; }
+.review-record-heading b { font-size: 14px; }
+.review-record-heading small, .review-status { font-size: 11px; }
+.review-vitals, .review-assessment>p { font-size: 13px; }
+.topbar-overline { font-size: 11px; }
+.workspace-topbar b { font-size: 14px; }
+.topbar-user { font-size: 12px; }
+.topbar-role { font-size: 11px; }
+.mbq-public-page p, .mbq-login p { font-size: max(14px, 1em); }
+.mbq-public-nav nav { font-size: 14px; }
+.mbq-public-brand small { font-size: 11px; }
+.mbq-public-brand b { font-size: 23px; }
+.mbq-section-label, .mbq-form-eyebrow, .mbq-login-eyebrow { font-size: 11px; }
+.mbq-hero-copy > p { font-size: 16px; }
+.mbq-primary-button, .mbq-secondary-link, .mbq-nav-button { font-size: 14px; }
+.mbq-feature-card p, .mbq-workflow .workflow-steps p { font-size: 13px; line-height: 1.75; }
+.mbq-feature-card h3, .mbq-workflow .workflow-steps h3 { font-size: 16px; }
+.mbq-login-message p, .mbq-form-description { font-size: 15px; }
+.mbq-field label { font-size: 14px; }
+.mbq-field input { font-size: 15px; }
+.mbq-login-submit { font-size: 15px; }
+.mbq-login-security span { font-size: 12px; }
+@media (max-width: 560px) {
+  .workspace-nav-link { min-height: 50px; font-size: 15px; }
+  .workspace-content { font-size: 14px; }
+  .data-table th { font-size: 11px; }
+  .data-table td { font-size: 12px; }
+  .staff-profile { min-height: 76px; }
+}
