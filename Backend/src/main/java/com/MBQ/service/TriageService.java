@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.MBQ.dto.TriageDtos;
 import com.MBQ.model.ClinicalRiskAssessment;
 import com.MBQ.model.Patient;
+import com.MBQ.model.PriorityLevel;
 import com.MBQ.model.QueueTicket;
 import com.MBQ.model.StaffUser;
 import com.MBQ.model.TriageObservation;
