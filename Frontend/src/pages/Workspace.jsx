@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, ArrowDownUp, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
@@ -218,7 +218,7 @@ function PriorityBadge({ priority }) {
   return <span className={"pill priority-badge " + config.className}><Icon size={13} aria-hidden="true" />{config.label}</span>;
 }
 
-function QueueTable({ rows, loading, now = Date.now(), onPatient, onComplete }) {
+function QueueTable({ rows, loading, now = Date.now(), onPatient }) {
   if (loading && !rows.length) return <div className="queue-skeleton" aria-label="Loading queue">{[1,2,3,4].map(item => <div className="skeleton-row" key={item}><i /><i /><i /><i /></div>)}</div>;
   if (!rows.length) return <div className="queue-empty-state"><span><ClipboardList size={24} /></span><h3>No patients waiting</h3><p>New queue tickets will appear here when patients are registered.</p></div>;
   return <div className="table-wrap"><table className="data-table dashboard-queue-table"><thead><tr><th>Ticket</th><th>Patient</th><th>Priority</th><th>Waiting</th><th>Status</th><th>Open</th></tr></thead><tbody>{rows.map(row => {
@@ -239,13 +239,7 @@ export function QueuePage() {
     catch (err) { setMessage(err.message); }
     finally { setBusy(false); }
   }
-  async function complete(row) {
-    setBusy(true); setMessage("");
-    try { await api("/queue/tickets/" + row.id + "/status", { method: "PATCH", body: { status: "COMPLETED", notes: "Completed by staff" } }); await refresh(); }
-    catch (err) { setMessage(err.message); }
-    finally { setBusy(false); }
-  }
-  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} onComplete={staff?.role === "ADMIN" || staff?.role === "DOCTOR" ? complete : null} /></section></>;
+  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} /></section></>;
 }
 
 export function PatientsPage() {
