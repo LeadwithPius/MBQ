@@ -1,56 +1,224 @@
-import { Activity, ArrowRight, ClipboardList, Droplet, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  ClipboardList,
+  Droplet,
+  ShieldCheck,
+  Stethoscope,
+  Users,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 const features = [
-  [Users, "Patient management", "Capture patient details and keep registration connected to the facility workflow."],
-  [ClipboardList, "Queue coordination", "See waiting patients, call the next patient and track ticket status."],
-  [Stethoscope, "Clinical triage", "Record observations and surface explainable clinical risk recommendations for review."],
-  [Droplet, "Blood bank readiness", "A dedicated workspace prepared for blood-stock and movement APIs."],
+  {
+    icon: Users,
+    title: "Patient management",
+    description:
+      "Register patients and maintain organised patient records.",
+  },
+  {
+    icon: ClipboardList,
+    title: "Queue coordination",
+    description:
+      "Coordinate waiting patients and improve department workflow.",
+  },
+  {
+    icon: Stethoscope,
+    title: "Clinical triage",
+    description:
+      "Record observations and support clinical review.",
+  },
+  {
+    icon: Droplet,
+    title: "Blood bank",
+    description:
+      "Support blood-stock visibility and resource management.",
+  },
 ];
 
 export default function LandingPage() {
   return (
-    <main className="public-page">
-      <header className="public-nav">
-        <Link className="public-brand" to="/"><span className="brand-symbol"><Activity size={22} /></span><span><b>MBQ</b><small>Hospital Operations</small></span></Link>
-        <nav><a href="#features">Platform</a><a href="#workflow">How it works</a><a href="#about">About</a></nav>
-        <Link className="button button-primary" to="/login">Staff sign in <ArrowRight size={16} /></Link>
+    <main className="public-page mbq-public-page">
+      <header className="public-nav mbq-public-nav">
+        <Link className="mbq-public-brand" to="/">
+          <img src="/mbq-logo.png" alt="MBQ Healthcare" />
+          <span>
+            <b>MBQ</b>
+            <small>Hospital Operations</small>
+          </span>
+        </Link>
+
+        <nav>
+          <a href="#features">Platform</a>
+          <a href="#workflow">How it works</a>
+          <a href="#about">About</a>
+        </nav>
+
+        <Link className="button mbq-nav-button" to="/login">
+          Staff sign in <ArrowRight size={16} />
+        </Link>
       </header>
 
-      <section className="hero-section">
-        <div className="hero-copy">
-          <span className="eyebrow">CONNECTED HOSPITAL OPERATIONS</span>
-          <h1>Better coordination.<br /><em>More focused care.</em></h1>
-          <p>One workspace for patient registration, queue coordination and clinical triage—designed to help hospital teams work with clearer information.</p>
-          <div className="hero-actions"><Link className="button button-primary" to="/login">Access staff portal <ArrowRight size={17} /></Link><a className="text-link" href="#features">Explore the platform</a></div>
-          <div className="hero-trust"><ShieldCheck size={17} /><span>Secure staff access with role-based permissions</span></div>
-        </div>
-        <div className="hero-visual">
-          <div className="visual-glow" />
-          <div className="overview-card">
-            <div className="overview-head"><span className="live-dot" /> OPERATIONS WORKSPACE <span className="overview-date">MBQ</span></div>
-            <div className="overview-title">A clearer view of care delivery</div>
-            <div className="overview-grid">
-              <div><span className="overview-icon"><Users size={18} /></span><b>Patients</b><small>Registration</small></div>
-              <div><span className="overview-icon teal"><ClipboardList size={18} /></span><b>Queue</b><small>Patient flow</small></div>
-              <div><span className="overview-icon violet"><Stethoscope size={18} /></span><b>Triage</b><small>Clinical review</small></div>
-              <div><span className="overview-icon amber"><Droplet size={18} /></span><b>Blood bank</b><small>Resource readiness</small></div>
-            </div>
-            <div className="overview-foot"><span>Designed around connected workflows</span><Activity size={18} /></div>
+      <section className="mbq-hero">
+        <div className="mbq-hero-copy">
+          <span className="mbq-section-label">
+            <span />
+            CONNECTED HOSPITAL OPERATIONS
+          </span>
+
+          <h1>
+            Manage better.
+            <br />
+            <span>Care better.</span>
+            <br />
+            Serve better.
+          </h1>
+
+          <p>
+            A connected hospital operations platform bringing patient
+            registration, queue coordination and clinical triage into
+            one organised workspace.
+          </p>
+
+          <div className="mbq-hero-actions">
+            <Link className="mbq-primary-button" to="/login">
+              Access staff portal <ArrowRight size={18} />
+            </Link>
+
+            <a className="mbq-secondary-link" href="#features">
+              Explore MBQ
+            </a>
           </div>
-          <div className="floating-note"><span className="note-check"><ShieldCheck size={16} /></span><span><b>One coordinated workspace</b><small>For hospital teams</small></span></div>
+
+          <div className="mbq-hero-security">
+            <ShieldCheck size={19} />
+            <span>Secure, role-based staff access</span>
+          </div>
+        </div>
+
+        <div className="mbq-hero-art">
+          <div className="mbq-hero-ring" />
+          <div className="mbq-hero-logo-card">
+            <img src="/mbq-logo.png" alt="MBQ Healthcare eagle emblem" />
+          </div>
+
+          <div className="mbq-hero-caption">
+            <span className="mbq-caption-pulse" />
+            <div>
+              <strong>MANAGE · CARE · SERVE</strong>
+              <small>One connected hospital workspace</small>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="feature-section" id="features">
-        <div className="section-intro"><span className="eyebrow">THE MBQ PLATFORM</span><h2>Essential workflows,<br />working together.</h2><p>Bring key operational tasks into one consistent staff experience.</p></div>
-        <div className="feature-grid">{features.map(([Icon, title, description]) => <article className="feature-card" key={title}><span className="feature-icon"><Icon size={21} /></span><h3>{title}</h3><p>{description}</p></article>)}</div>
+      <section className="mbq-brand-strip">
+        <div>
+          <Users size={25} />
+          <span>QUEUES</span>
+        </div>
+        <i />
+        <div>
+          <Activity size={25} />
+          <span>TRIAGE</span>
+        </div>
+        <i />
+        <div>
+          <Droplet size={25} />
+          <span>BLOOD BANK</span>
+        </div>
       </section>
 
-      <section className="workflow-section" id="workflow"><span className="eyebrow">A CONNECTED WORKFLOW</span><h2>From reception to clinical review.</h2><div className="workflow-steps"><div><b>01</b><h3>Register</h3><p>Capture the patient record at reception.</p></div><div><b>02</b><h3>Coordinate</h3><p>Create and manage the department queue.</p></div><div><b>03</b><h3>Assess</h3><p>Record observations and review risk recommendations.</p></div></div></section>
+      <section className="feature-section mbq-features" id="features">
+        <div className="section-intro">
+          <span className="mbq-section-label">
+            <span />
+            THE MBQ PLATFORM
+          </span>
 
-      <section className="public-cta" id="about"><div><span className="eyebrow">MBQ HOSPITAL OPERATIONS</span><h2>Give your team a more connected way to work.</h2><p>Sign in with your hospital-issued staff account to access the workspace.</p></div><Link className="button button-light" to="/login">Staff sign in <ArrowRight size={17} /></Link></section>
-      <footer className="public-footer"><Link className="public-brand" to="/"><span className="brand-symbol"><Activity size={20} /></span><span><b>MBQ</b><small>Hospital Operations</small></span></Link><span>© {new Date().getFullYear()} MBQ. Hospital operations platform.</span></footer>
+          <h2>
+            Essential workflows.
+            <br />
+            One connected platform.
+          </h2>
+
+          <p>
+            Give hospital teams a consistent place to coordinate
+            essential operational tasks.
+          </p>
+        </div>
+
+        <div className="feature-grid">
+          {features.map(({ icon: Icon, title, description }) => (
+            <article className="feature-card mbq-feature-card" key={title}>
+              <span className="mbq-feature-icon">
+                <Icon size={23} />
+              </span>
+
+              <h3>{title}</h3>
+              <p>{description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="workflow-section mbq-workflow" id="workflow">
+        <span className="mbq-section-label">
+          <span />
+          A CONNECTED WORKFLOW
+        </span>
+
+        <h2>From reception to clinical review.</h2>
+
+        <div className="workflow-steps">
+          <div>
+            <b>01</b>
+            <h3>Register</h3>
+            <p>Capture patient details and establish the patient record.</p>
+          </div>
+
+          <div>
+            <b>02</b>
+            <h3>Coordinate</h3>
+            <p>Manage department queues and coordinate patient flow.</p>
+          </div>
+
+          <div>
+            <b>03</b>
+            <h3>Assess</h3>
+            <p>Record clinical observations and review assessments.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mbq-public-cta" id="about">
+        <div>
+          <span>MBQ HOSPITAL OPERATIONS</span>
+          <h2>Manage. Care. Serve.</h2>
+          <p>
+            Access your hospital workspace using your authorised
+            staff account.
+          </p>
+        </div>
+
+        <Link to="/login">
+          Staff sign in <ArrowRight size={18} />
+        </Link>
+      </section>
+
+      <footer className="mbq-public-footer">
+        <Link className="mbq-public-brand" to="/">
+          <img src="/mbq-logo.png" alt="MBQ Healthcare" />
+          <span>
+            <b>MBQ</b>
+            <small>Hospital Operations</small>
+          </span>
+        </Link>
+
+        <span>
+          © {new Date().getFullYear()} MBQ. Manage · Care · Serve.
+        </span>
+      </footer>
     </main>
   );
 }

@@ -21,7 +21,26 @@ export function WorkspaceLayout() {
   return <div className="workspace">
     {menuOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
     <aside className={"workspace-sidebar " + (menuOpen ? "sidebar-visible" : "")}>
-      <div className="workspace-brand"><span className="brand-symbol"><Activity size={21} /></span><span><b>MBQ</b><small>Hospital Operations</small></span><button className="sidebar-close" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={19} /></button></div>
+      <div className="workspace-brand">
+  <img
+    className="workspace-logo-image"
+    src="/mbq-logo.png"
+    alt="MBQ Healthcare"
+  />
+
+  <span>
+    <b>MBQ</b>
+    <small>Hospital Operations</small>
+  </span>
+
+  <button
+    className="sidebar-close"
+    onClick={() => setMenuOpen(false)}
+    aria-label="Close menu"
+  >
+    <X size={19} />
+  </button>
+</div>
       <span className="sidebar-caption">WORKSPACE</span>
       <nav className="workspace-nav">{visibleLinks.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={() => setMenuOpen(false)} className={({ isActive }) => "workspace-nav-link" + (isActive ? " active" : "")}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
       <div className="sidebar-bottom"><div className="sidebar-help"><ShieldAlert size={19} /><b>Clinical responsibility</b><p>Use the system alongside your facility's approved clinical procedures.</p></div><div className="staff-profile"><span className="staff-avatar">{(staff?.name || "S").split(" ").map(part => part[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{staff?.name || "Staff member"}</b><small>{staff?.role || "STAFF"}</small></span><button onClick={() => { logout(); navigate("/login", { replace: true }); }} aria-label="Sign out"><LogOut size={17} /></button></div></div>
