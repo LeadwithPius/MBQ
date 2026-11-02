@@ -280,7 +280,7 @@ public class BloodInventoryService {
                     WHERE id = ?
                     """, payload, id);
             if (updated != 1) throw new IllegalStateException("Could not complete inventory operation");
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Could not serialize inventory operation result", ex);
         }
     }
