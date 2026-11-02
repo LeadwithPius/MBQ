@@ -9,8 +9,6 @@ import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,7 +32,6 @@ import com.MBQ.repository.FacilityRepository;
 import com.MBQ.repository.PatientRepository;
 import com.MBQ.repository.QueueTicketRepository;
 import com.MBQ.repository.QueueTicketStatusHistoryRepository;
-import com.MBQ.repository.StaffUserRepository;
 
 @Service
 public class QueueService {
@@ -45,52 +42,32 @@ public class QueueService {
     private final QueueTicketRepository queueTicketRepository;
     private final QueueTicketStatusHistoryRepository historyRepository;
     private final JdbcTemplate jdbcTemplate;
-    private final StaffUserRepository staffUserRepository;
+    private final StaffAccessService staffAccess;
 
- public QueueService(
-        PatientRepository patientRepository,
-        FacilityRepository facilityRepository,
-        DepartmentRepository departmentRepository,
-        QueueTicketRepository queueTicketRepository,
-        QueueTicketStatusHistoryRepository historyRepository,
-        StaffUserRepository staffUserRepository,
-        JdbcTemplate jdbcTemplate
-) {
-    this.patientRepository = patientRepository;
-    this.facilityRepository = facilityRepository;
-    this.departmentRepository = departmentRepository;
-    this.queueTicketRepository = queueTicketRepository;
-    this.historyRepository = historyRepository;
-    this.staffUserRepository = staffUserRepository;
-    this.jdbcTemplate = jdbcTemplate;
-}
-
-    // ---------------------------------------------------------
-    // STEP 1: REGISTER A PATIENT
-    // ---------------------------------------------------------
+    public QueueService(
+            PatientRepository patientRepository,
+            FacilityRepository facilityRepository,
+            DepartmentRepository departmentRepository,
+            QueueTicketRepository queueTicketRepository,
+            QueueTicketStatusHistoryRepository historyRepository,
+            JdbcTemplate jdbcTemplate,
+            StaffAccessService staffAccess) {
+        this.patientRepository = patientRepository;
+        this.facilityRepository = facilityRepository;
+        this.departmentRepository = departmentRepository;
+        this.queueTicketRepository = queueTicketRepository;
+        this.historyRepository = historyRepository;
+        this.jdbcTemplate = jdbcTemplate;
+        this.staffAccess = staffAccess;
+    }
 
     @Transactional
-    public PatientResponse registerPatient(
-            PatientRegistrationRequest request
-    ) {
-        StaffUser currentStaff = getAuthenticatedStaff();
-        Long staffFacilityId = currentStaff.getDepartment() == null
-                || currentStaff.getDepartment().getFacility() == null
-                ? null
-                : currentStaff.getDepartment().getFacility().getId();
-
-        if (!"ADMIN".equals(currentStaff.getRole().name())
-                && !Objects.equals(staffFacilityId, request.facilityId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "You can only register patients at your assigned facility");
-        }
+    public PatientResponse registerPatient(PatientRegistrationRequest request) {
+        staffAccess.requireFacilityAccess(request.facilityId());
 
         Facility facility = facilityRepository.findById(request.facilityId())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Facility not found"
-                ));
+                        HttpStatus.NOT_FOUND, "Facility not found"));
 
         Patient patient = new Patient();
         patient.setName(request.name().trim());
@@ -100,64 +77,33 @@ public class QueueService {
         patient.setBloodGroup(request.bloodGroup());
         patient.setFacility(facility);
 
-        Patient saved = patientRepository.save(patient);
-
-        return toPatientResponse(saved);
+        return toPatientResponse(patientRepository.save(patient));
     }
-
-    // ---------------------------------------------------------
-    // STEP 2: CREATE A QUEUE TICKET
-    // ---------------------------------------------------------
 
     @Transactional
     public TicketResponse createTicket(CreateTicketRequest request) {
         Patient patient = patientRepository.findById(request.patientId())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Patient not found"
-                ));
+                        HttpStatus.NOT_FOUND, "Patient not found"));
 
-        Department department = departmentRepository
-                .findById(request.departmentId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Department not found"
-                ));
+        Department department = requireDepartment(request.departmentId());
+
+        staffAccess.requireDepartmentAccess(department);
+        staffAccess.requirePatientFacilityAccess(patient);
 
         Long departmentFacilityId = department.getFacility().getId();
-        StaffUser currentStaff = getAuthenticatedStaff();
-        Long staffFacilityId = currentStaff.getDepartment() == null
-                || currentStaff.getDepartment().getFacility() == null
-                ? null
-                : currentStaff.getDepartment().getFacility().getId();
-
-        if (!"ADMIN".equals(currentStaff.getRole().name())
-                && !Objects.equals(staffFacilityId, departmentFacilityId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "You can only create queue tickets within your assigned facility");
-        }
-
         if (patient.getFacility() == null
-                || !Objects.equals(
-                        patient.getFacility().getId(),
-                        departmentFacilityId
-                )) {
+                || !Objects.equals(patient.getFacility().getId(), departmentFacilityId)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "The patient and department must belong to the same facility"
-            );
+                    "The patient and department must belong to the same facility");
         }
 
         LocalDate issueDate = LocalDate.now();
-
         Integer sequenceNumber = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO queue_ticket_sequence (
-                    facility_id,
-                    department_id,
-                    issue_date,
-                    last_number
+                    facility_id, department_id, issue_date, last_number
                 )
                 VALUES (?, ?, ?, 1)
                 ON CONFLICT (facility_id, department_id, issue_date)
@@ -168,21 +114,17 @@ public class QueueService {
                 Integer.class,
                 departmentFacilityId,
                 department.getId(),
-                issueDate
-        );
+                issueDate);
 
         if (sequenceNumber == null) {
-            throw new IllegalStateException(
-                    "Could not allocate a ticket number"
-            );
+            throw new IllegalStateException("Could not allocate a ticket number");
         }
 
         String ticketNumber = generateTicketNumber(
                 departmentFacilityId,
                 department.getName(),
                 issueDate,
-                sequenceNumber
-        );
+                sequenceNumber);
 
         QueueTicket ticket = new QueueTicket();
         ticket.setTicketNumber(ticketNumber);
@@ -191,126 +133,87 @@ public class QueueService {
         ticket.setPriorityLevel(
                 request.priorityLevel() == null
                         ? PriorityLevel.NORMAL
-                        : request.priorityLevel()
-        );
+                        : request.priorityLevel());
         ticket.setStatus(TicketStatus.WAITING);
         ticket.setTimeIssued(LocalDateTime.now());
         ticket.setTriageNotes(trimToNull(request.triageNotes()));
         ticket.setRequiresBlood(request.requiresBlood());
 
         QueueTicket saved = queueTicketRepository.saveAndFlush(ticket);
-
-        recordStatusChange(
-                saved,
-                null,
-                TicketStatus.WAITING,
-                "Ticket created"
-        );
+        recordStatusChange(saved, null, TicketStatus.WAITING, "Ticket created");
 
         return toTicketResponse(saved);
     }
 
-    // ---------------------------------------------------------
-    // STEP 3: RETRIEVE THE WAITING QUEUE
-    // ---------------------------------------------------------
-
     @Transactional(readOnly = true)
     public List<TicketResponse> getWaitingQueue(Long departmentId) {
-        requireDepartment(departmentId);
+        Department department = requireDepartment(departmentId);
+        staffAccess.requireDepartmentAccess(department);
 
         return queueTicketRepository.findQueueByDepartmentAndStatus(
-                        departmentId,
-                        TicketStatus.WAITING
-                )
+                        departmentId, TicketStatus.WAITING)
                 .stream()
                 .map(this::toTicketResponse)
                 .toList();
     }
 
-    // ---------------------------------------------------------
-    // STEP 4: CALL THE NEXT PATIENT
-    // ---------------------------------------------------------
-
     @Transactional
     public TicketResponse callNextPatient(Long departmentId) {
-        requireDepartment(departmentId);
+        Department department = requireDepartment(departmentId);
+        staffAccess.requireDepartmentAccess(department);
 
         QueueTicket ticket = queueTicketRepository
                 .findNextWaitingForUpdateSkipLocked(departmentId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "No waiting patients are available in this department"
-                ));
+                        "No waiting patients are available in this department"));
 
         TicketStatus previousStatus = ticket.getStatus();
-
         ticket.setStatus(TicketStatus.IN_PROGRESS);
-
         QueueTicket saved = queueTicketRepository.saveAndFlush(ticket);
 
         recordStatusChange(
-                saved,
-                previousStatus,
-                TicketStatus.IN_PROGRESS,
-                "Patient called"
-        );
+                saved, previousStatus, TicketStatus.IN_PROGRESS, "Patient called");
 
         return toTicketResponse(saved);
     }
 
-    // ---------------------------------------------------------
-    // STEP 5: UPDATE TICKET STATUS
-    // ---------------------------------------------------------
-
     @Transactional
     public TicketResponse updateTicketStatus(
             Long ticketId,
-            UpdateTicketStatusRequest request
-    ) {
-        QueueTicket ticket = queueTicketRepository
-                .findByIdForUpdate(ticketId)
+            UpdateTicketStatusRequest request) {
+
+        QueueTicket ticket = queueTicketRepository.findByIdForUpdate(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Queue ticket not found"
-                ));
+                        HttpStatus.NOT_FOUND, "Queue ticket not found"));
+
+        staffAccess.requireTicketDepartmentAccess(ticket);
 
         TicketStatus previousStatus = ticket.getStatus();
         TicketStatus newStatus = request.status();
-
         validateTransition(previousStatus, newStatus);
 
         ticket.setStatus(newStatus);
-
         if (request.outcome() != null) {
             ticket.setOutcome(trimToNull(request.outcome()));
         }
 
         QueueTicket saved = queueTicketRepository.saveAndFlush(ticket);
-
         recordStatusChange(
-                saved,
-                previousStatus,
-                newStatus,
-                trimToNull(request.notes())
-        );
+                saved, previousStatus, newStatus, trimToNull(request.notes()));
 
         return toTicketResponse(saved);
     }
 
-    // ---------------------------------------------------------
-    // STEP 6: RETRIEVE TICKET HISTORY
-    // ---------------------------------------------------------
-
     @Transactional(readOnly = true)
     public List<TicketHistoryResponse> getTicketHistory(Long ticketId) {
-        queueTicketRepository.findById(ticketId)
+        QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Queue ticket not found"
-                ));
+                        HttpStatus.NOT_FOUND, "Queue ticket not found"));
 
-        return historyRepository
-                .findByTicket_IdOrderByChangedAtAscIdAsc(ticketId)
+        staffAccess.requireTicketDepartmentAccess(ticket);
+
+        return historyRepository.findByTicket_IdOrderByChangedAtAscIdAsc(ticketId)
                 .stream()
                 .map(history -> new TicketHistoryResponse(
                         history.getId(),
@@ -319,108 +222,56 @@ public class QueueService {
                         history.getNewStatus(),
                         history.getChangedByStaffId(),
                         history.getChangedAt(),
-                        history.getNotes()
-                ))
+                        history.getNotes()))
                 .toList();
     }
-
-    // ---------------------------------------------------------
-    // SHARED HELPERS
-    // ---------------------------------------------------------
 
     private Department requireDepartment(Long departmentId) {
         return departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Department not found"
-                ));
+                        HttpStatus.NOT_FOUND, "Department not found"));
     }
 
-    private void validateTransition(
-            TicketStatus current,
-            TicketStatus target
-    ) {
+    private void validateTransition(TicketStatus current, TicketStatus target) {
         boolean allowed = switch (current) {
-            case WAITING ->
-                    target == TicketStatus.IN_PROGRESS
+            case WAITING -> target == TicketStatus.IN_PROGRESS
                     || target == TicketStatus.CANCELLED;
-
-            case IN_PROGRESS ->
-                    target == TicketStatus.COMPLETED
+            case IN_PROGRESS -> target == TicketStatus.COMPLETED
                     || target == TicketStatus.CANCELLED;
-
             case COMPLETED, CANCELLED -> false;
         };
 
         if (!allowed) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Invalid ticket status transition: "
-                            + current + " -> " + target
-            );
+                    "Invalid ticket status transition: " + current + " -> " + target);
         }
     }
 
     private void recordStatusChange(
-        QueueTicket ticket,
-        TicketStatus previousStatus,
-        TicketStatus newStatus,
-        String notes
-) {
-    StaffUser staff = getAuthenticatedStaff();
+            QueueTicket ticket,
+            TicketStatus previousStatus,
+            TicketStatus newStatus,
+            String notes) {
 
-    QueueTicketStatusHistory history =
-            new QueueTicketStatusHistory();
-
-    history.setTicket(ticket);
-    history.setPreviousStatus(previousStatus);
-    history.setNewStatus(newStatus);
-    history.setChangedAt(LocalDateTime.now());
-    history.setNotes(notes);
-    history.setChangedByStaffId(staff.getId());
-
-    historyRepository.save(history);
-}
-private StaffUser getAuthenticatedStaff() {
-    Authentication authentication =
-            SecurityContextHolder.getContext().getAuthentication();
-
-    if (authentication == null
-            || !authentication.isAuthenticated()
-            || authentication.getName() == null
-            || authentication.getName().equals("anonymousUser")) {
-
-        throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "Authenticated staff identity is required"
-        );
+        StaffUser staff = staffAccess.currentStaff();
+        QueueTicketStatusHistory history = new QueueTicketStatusHistory();
+        history.setTicket(ticket);
+        history.setPreviousStatus(previousStatus);
+        history.setNewStatus(newStatus);
+        history.setChangedAt(LocalDateTime.now());
+        history.setNotes(notes);
+        history.setChangedByStaffId(staff.getId());
+        historyRepository.save(history);
     }
-
-    StaffUser staff = staffUserRepository
-            .findByUsername(authentication.getName())
-            .orElseThrow(() -> new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Authenticated staff account was not found"
-            ));
-
-    if (!staff.isActive()) {
-        throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "This staff account is inactive"
-        );
-    }
-
-    return staff;
-}
 
     private String generateTicketNumber(
             Long facilityId,
             String departmentName,
             LocalDate issueDate,
-            int sequenceNumber
-    ) {
-        String departmentCode = departmentName
-                .toUpperCase(Locale.ROOT)
+            int sequenceNumber) {
+
+        String departmentCode = departmentName.toUpperCase(Locale.ROOT)
                 .replaceAll("[^A-Z0-9]", "");
 
         if (departmentCode.isEmpty()) {
@@ -445,8 +296,7 @@ private StaffUser getAuthenticatedStaff() {
                 patient.getBloodGroup(),
                 patient.getFacility() == null
                         ? null
-                        : patient.getFacility().getId()
-        );
+                        : patient.getFacility().getId());
     }
 
     private TicketResponse toTicketResponse(QueueTicket ticket) {
@@ -462,15 +312,10 @@ private StaffUser getAuthenticatedStaff() {
                 ticket.getTimeIssued(),
                 ticket.isRequiresBlood(),
                 ticket.getTriageNotes(),
-                ticket.getOutcome()
-        );
+                ticket.getOutcome());
     }
 
     private String trimToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        return value.trim();
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
