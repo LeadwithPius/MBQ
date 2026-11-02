@@ -1176,3 +1176,81 @@
 @media (prefers-reduced-motion:reduce) {
   .stat-card.stat-alert-active, .skeleton-row i { animation:none; }
 }
+
+
+/* Landing page: problem, platform modules and five-step workflow */
+.mbq-content-width { width:min(1124px, calc(100% - 56px)); margin:0 auto; }
+.mbq-problem-section { padding:76px 0 84px; background:#f7faf7; border-top:1px solid #edf2ed; border-bottom:1px solid #edf2ed; }
+.mbq-problem-intro { max-width:760px; }
+.mbq-problem-intro h2, .mbq-workflow-intro h2 {
+  margin:15px 0 12px; color:var(--mbq-green-dark); font-family:"Manrope",sans-serif;
+  font-size:clamp(29px,3.4vw,42px); line-height:1.16; letter-spacing:-1.4px;
+}
+.mbq-problem-intro > p, .mbq-workflow-intro > p {
+  max-width:740px; margin:0; color:#687d70; font-size:15px; line-height:1.85;
+}
+.mbq-problem-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:34px; }
+.mbq-problem-card {
+  min-height:190px; padding:23px; border:1px solid #e4ece5; border-radius:14px;
+  background:#fff; box-shadow:0 7px 24px #003b2108;
+}
+.mbq-problem-icon {
+  width:43px; height:43px; display:grid; place-items:center; border-radius:12px;
+  background:#fff1e8; color:#c86a28;
+}
+.mbq-problem-card h3 { margin:18px 0 8px; color:#193d2b; font-size:16px; }
+.mbq-problem-card p { margin:0; color:#718276; font-size:13px; line-height:1.75; }
+.mbq-module-grid { max-width:1124px; margin:40px auto 0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:17px; }
+.mbq-module-card { position:relative; min-height:270px; padding:25px; }
+.mbq-module-number {
+  position:absolute; top:27px; right:25px; color:#d5e4d9;
+  font-family:"Manrope",sans-serif; font-size:27px; font-weight:800;
+}
+.mbq-module-card h3 { margin:19px 0 7px; font-size:19px; }
+.mbq-module-card > strong { display:block; margin-bottom:10px; color:#35724d; font-size:13px; line-height:1.5; }
+.mbq-module-card p { margin:0; color:#718276; font-size:13px; line-height:1.8; }
+.mbq-reports-card {
+  max-width:1124px; margin:17px auto 0; padding:18px 21px; display:flex; align-items:center; gap:15px;
+  border:1px solid #e4ece5; border-radius:12px; background:#fff;
+}
+.mbq-reports-icon { width:40px; height:40px; flex:0 0 40px; display:grid; place-items:center; border-radius:11px; background:#edf4ef; color:var(--mbq-green); }
+.mbq-reports-card h3 { margin:0 0 4px; color:#234631; font-size:14px; }
+.mbq-reports-card p { margin:0; color:#758579; font-size:12px; line-height:1.65; }
+.mbq-workflow { padding-top:86px; padding-bottom:92px; }
+.mbq-workflow-intro { max-width:740px; }
+.mbq-workflow-steps {
+  display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin-top:42px;
+  border-top:1px solid #dce9df;
+}
+.mbq-workflow-step { position:relative; min-width:0; padding:24px 20px 0 0; }
+.mbq-step-number {
+  display:inline-flex; align-items:center; justify-content:center; width:39px; height:39px;
+  margin-top:-44px; border:5px solid #fff; border-radius:50%; background:var(--mbq-green);
+  color:#fff; font-size:10px; font-weight:800; box-shadow:0 0 0 1px #dce9df;
+}
+.mbq-step-content h3 { margin:17px 0 8px; color:#214631; font-size:15px; }
+.mbq-step-content p { margin:0; color:#718276; font-size:12px; line-height:1.8; }
+.mbq-public-cta { margin-left:auto; margin-right:auto; width:calc(100% - 56px); }
+@media (max-width:900px) {
+  .mbq-module-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .mbq-module-card:last-child { grid-column:1 / -1; }
+  .mbq-workflow-steps { grid-template-columns:repeat(3,minmax(0,1fr)); row-gap:34px; border-top:0; }
+  .mbq-workflow-step { padding-top:0; border-top:1px solid #dce9df; }
+  .mbq-step-number { margin-top:-20px; }
+}
+@media (max-width:700px) {
+  .mbq-content-width { width:calc(100% - 40px); }
+  .mbq-problem-section { padding:58px 0 62px; }
+  .mbq-problem-grid { grid-template-columns:1fr; gap:12px; margin-top:25px; }
+  .mbq-problem-card { min-height:0; padding:20px; }
+  .mbq-problem-card h3 { margin-top:13px; }
+  .mbq-module-grid { grid-template-columns:1fr; margin-top:28px; }
+  .mbq-module-card, .mbq-module-card:last-child { min-height:0; grid-column:auto; }
+  .mbq-reports-card { margin-top:13px; align-items:flex-start; }
+  .mbq-workflow { padding:62px 22px 68px; }
+  .mbq-workflow-steps { grid-template-columns:1fr; gap:22px; margin-top:30px; }
+  .mbq-workflow-step { display:grid; grid-template-columns:39px 1fr; gap:14px; padding:0; border:0; }
+  .mbq-step-number { margin:0; border:0; box-shadow:none; }
+  .mbq-step-content h3 { margin:3px 0 6px; }
+  .mbq-public-cta { width:calc(100% - 36px); }
+}
