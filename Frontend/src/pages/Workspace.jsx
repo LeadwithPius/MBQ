@@ -55,7 +55,7 @@ export function WorkspaceLayout() {
         {confirmLogout && <div className="logout-confirm" role="dialog" aria-label="Confirm sign out"><span>Sign out of this workstation?</span><button onClick={() => setConfirmLogout(false)}>Stay</button><button onClick={() => { logout(); navigate("/login", { replace: true }); }}>Sign out</button></div>}
       </div></div>
     </aside>
-    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations"}</b></div><div className="topbar-user"><span className="status-pip" /> {staff?.name || "Staff workspace"} <span className="topbar-role">{staff?.role || "STAFF"}</span></div></header><div className="workspace-content"><Outlet /></div></main>
+    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations"}</b></div><div className="topbar-user"><span className="status-pip" /> Clinical workspace</div></header><div className="workspace-content"><Outlet /></div></main>
   </div>;
 }
 
@@ -230,6 +230,7 @@ function QueueTable({ rows, loading, now = Date.now(), onPatient }) {
 
 export function QueuePage() {
   const { staff } = useAuth();
+  const navigate = useNavigate();
   const { queue, loading, error, refresh } = useDepartmentQueue();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -239,7 +240,7 @@ export function QueuePage() {
     catch (err) { setMessage(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} /></section></>;
+  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} onPatient={() => navigate("/app/patients")} /></section></>;
 }
 
 export function PatientsPage() {
