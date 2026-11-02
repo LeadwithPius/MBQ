@@ -26,25 +26,27 @@ export function clearSession() {
 }
 
 export async function api(path, options = {}) {
+  const { auth = true, headers: suppliedHeaders, ...requestOptions } = options;
   const session = readSession();
-  const headers = new Headers(options.headers || {});
-  if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
-  if (options.auth !== false && session?.accessToken) headers.set("Authorization", "Bearer " + session.accessToken);
+  const headers = new Headers(suppliedHeaders || {});
+  const isForm = typeof FormData !== "undefined" && requestOptions.body instanceof FormData;
+  if (requestOptions.body && !isForm) headers.set("Content-Type", "application/json");
+  if (auth && session?.accessToken) headers.set("Authorization", "Bearer " + session.accessToken);
 
   let response;
   try {
     response = await fetch(API_BASE + path, {
-      ...options,
+      ...requestOptions,
       headers,
-      body: options.body && typeof options.body !== "string" && !(options.body instanceof FormData)
-        ? JSON.stringify(options.body)
-        : options.body,
+      body: requestOptions.body && typeof requestOptions.body !== "string" && !isForm
+        ? JSON.stringify(requestOptions.body)
+        : requestOptions.body,
     });
   } catch {
     throw new Error("Unable to reach the MBQ server. Check that the backend is running.");
   }
 
-  if (response.status === 401 && options.auth !== false) {
+  if (response.status === 401 && auth) {
     clearSession();
     window.dispatchEvent(new Event("mbq:unauthorized"));
   }
