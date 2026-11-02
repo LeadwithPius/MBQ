@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, ClipboardList, Droplet, LayoutDashboard, LogOut, Menu, Plus, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { ROLE_ACCESS } from "../roleAccess";
 
 const links = [
@@ -63,17 +63,44 @@ function PageHeading({ eyebrow = "HOSPITAL OPERATIONS", title, description, acti
 
 function useDepartmentQueue() {
   const { staff } = useAuth();
+  const departmentId = staff?.departmentId;
   const [queue, setQueue] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(departmentId));
   const [error, setError] = useState("");
+
+  const loadQueue = useCallback(async () => {
+    if (!departmentId) return;
+    try {
+      const data = await api("/queue/departments/" + departmentId + "/waiting");
+      setQueue(Array.isArray(data) ? data : []);
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [departmentId]);
+
   const refresh = useCallback(async () => {
-    if (!staff?.departmentId) { setLoading(false); setError("Your staff account is not assigned to a department."); return; }
-    try { const data = await api("/queue/departments/" + staff.departmentId + "/waiting"); setQueue(Array.isArray(data) ? data : []); setError(""); }
-    catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-  }, [staff?.departmentId]);
-  useEffect(() => { refresh(); const timer = window.setInterval(refresh, 30000); return () => window.clearInterval(timer); }, [refresh]);
-  return { queue, loading, error, refresh, departmentId: staff?.departmentId };
+    if (!departmentId) return;
+    setLoading(true);
+    await loadQueue();
+  }, [departmentId, loadQueue]);
+
+  useEffect(() => {
+    if (!departmentId) return undefined;
+    void loadQueue();
+    const timer = window.setInterval(() => { void loadQueue(); }, 30000);
+    return () => window.clearInterval(timer);
+  }, [departmentId, loadQueue]);
+
+  return {
+    queue,
+    loading,
+    error: departmentId ? error : "Your staff account is not assigned to a department.",
+    refresh,
+    departmentId,
+  };
 }
 
 export function DashboardPage() {
@@ -127,7 +154,6 @@ export function PatientsPage() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
   const load = useCallback(async () => {
-    setLoading(true);
     try { const data = await api("/patients"); setPatients(Array.isArray(data) ? data : []); setError(""); }
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
