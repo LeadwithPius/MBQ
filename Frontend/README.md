@@ -1,16 +1,41 @@
-# React + Vite
+# MBQ frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React application has a public landing page and a JWT-protected staff workspace.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Start PostgreSQL and the Spring Boot backend on port 8080.
+2. From this directory run:
 
-## React Compiler
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+3. Open http://localhost:5173.
 
-## Expanding the Oxlint configuration
+Vite proxies requests beginning with `/api` to `http://localhost:8080`. Override the target with `MBQ_API_TARGET` if needed.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+For a separately hosted API, set `VITE_API_BASE_URL` to the full API base, including `/api`, for example `https://api.example.org/api`.
+
+## Authentication
+
+The login page calls `POST /api/auth/login`. The access token is stored in session storage and sent as a Bearer token. It is cleared on logout, token expiry, or an API 401 response. The application does not implement refresh tokens because the backend does not currently issue them.
+
+## Connected API modules
+
+- Authentication: `POST /api/auth/login`
+- Patients: `GET/POST /api/patients`
+- Queue: `GET /api/queue/departments/{departmentId}/waiting`, `POST /api/queue/tickets`, `POST /api/queue/departments/{departmentId}/call-next`, `PATCH /api/queue/tickets/{ticketId}/status`
+- Triage: observation creation, patient observation lookup, assessment lookup and clinician review under `/api/triage`
+
+The patient-list and queue-ticket-creation endpoints were added in this integration branch. Patient listing is scoped to the authenticated staff member's facility. Queue-ticket creation and patient registration enforce facility scope for non-admin staff.
+
+Blood-bank and reporting screens remain explicitly marked as pending because those backend APIs are not yet exposed. They do not display mock records or invented metrics.
+
+## Before production
+
+- Set `VITE_API_BASE_URL` to the deployed API base.
+- Set backend `CORS_ALLOWED_ORIGINS` to the exact deployed frontend origin(s), comma-separated.
+- Serve the frontend and API over HTTPS.
+- Run `npm install` after pulling this branch to synchronize `package-lock.json` with the added React Router dependency, then run `npm run build`.
