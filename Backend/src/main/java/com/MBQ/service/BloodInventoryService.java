@@ -16,8 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import com.MBQ.dto.BloodInventoryDtos.BatchAllocation;
 import com.MBQ.dto.BloodInventoryDtos.InventoryOperationResponse;
 import com.MBQ.dto.BloodInventoryDtos.IssueRequest;
@@ -44,7 +44,7 @@ public class BloodInventoryService {
     private final BloodInventoryOperationRepository operations;
     private final StaffAccessService staffAccess;
     private final JdbcTemplate jdbc;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     public BloodInventoryService(
             BloodStockRepository stocks,
@@ -53,7 +53,7 @@ public class BloodInventoryService {
             BloodInventoryOperationRepository operations,
             StaffAccessService staffAccess,
             JdbcTemplate jdbc,
-            ObjectMapper objectMapper) {
+            JsonMapper objectMapper) {
         this.stocks = stocks;
         this.batches = batches;
         this.movements = movements;
@@ -266,7 +266,7 @@ public class BloodInventoryService {
                     saved.operationId(), saved.operationType(), saved.stockId(),
                     saved.unitsChanged(), saved.quantityBefore(), saved.quantityAfter(),
                     saved.allocations(), true);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Stored inventory operation result is invalid", ex);
         }
     }
