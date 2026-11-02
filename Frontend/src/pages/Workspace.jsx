@@ -125,19 +125,103 @@ export function PatientsPage() {
 
 export function TriagePage() {
   const { staff } = useAuth();
+  const canRecord = staff?.role === "ADMIN" || staff?.role === "NURSE";
+  const canReview = staff?.role === "ADMIN" || staff?.role === "DOCTOR";
   const [form, setForm] = useState({ patientId: "", queueTicketId: "", systolicBp: "", diastolicBp: "", heartRate: "", respiratoryRate: "", temperatureC: "", spo2Percent: "", symptoms: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [assessment, setAssessment] = useState(null);
+  const [lookupId, setLookupId] = useState("");
+  const [records, setRecords] = useState([]);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState({});
+  const [reviewPriority, setReviewPriority] = useState({});
+  const [reviewBusy, setReviewBusy] = useState(null);
+  const [notice, setNotice] = useState("");
+
   function update(key, value) { setForm(current => ({ ...current, [key]: value })); }
+
   async function submit(event) {
-    event.preventDefault(); setBusy(true); setError(""); setAssessment(null);
+    event.preventDefault(); setBusy(true); setError(""); setAssessment(null); setNotice("");
     const body = { patientId: Number(form.patientId), queueTicketId: form.queueTicketId ? Number(form.queueTicketId) : null, assessedById: staff.id, measuredAt: new Date().toISOString(), systolicBp: numberOrNull(form.systolicBp), diastolicBp: numberOrNull(form.diastolicBp), heartRate: numberOrNull(form.heartRate), respiratoryRate: numberOrNull(form.respiratoryRate), temperatureC: form.temperatureC === "" ? null : Number(form.temperatureC), spo2Percent: numberOrNull(form.spo2Percent), symptoms: form.symptoms, notes: form.notes };
-    try { const result = await api("/triage/observations", { method: "POST", body }); setAssessment(result); }
+    try { const result = await api("/triage/observations", { method: "POST", body }); setAssessment(result); setNotice("Observation recorded. The recommendation requires clinician review."); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Clinical triage" description="Record observations and review the preliminary risk assessment. Clinical decisions remain with qualified staff." /><section className="panel form-panel"><div className="panel-heading"><div><h2>Record observations</h2><p>Enter the patient and available vital signs</p></div></div><form className="form-grid" onSubmit={submit}><label>Patient ID<input type="number" min="1" required value={form.patientId} onChange={e => update("patientId", e.target.value)} /></label><label>Queue ticket ID<input type="number" min="1" value={form.queueTicketId} onChange={e => update("queueTicketId", e.target.value)} /></label><label>Systolic BP (mmHg)<input type="number" value={form.systolicBp} onChange={e => update("systolicBp", e.target.value)} /></label><label>Diastolic BP (mmHg)<input type="number" value={form.diastolicBp} onChange={e => update("diastolicBp", e.target.value)} /></label><label>Heart rate (bpm)<input type="number" value={form.heartRate} onChange={e => update("heartRate", e.target.value)} /></label><label>Respiratory rate (/min)<input type="number" value={form.respiratoryRate} onChange={e => update("respiratoryRate", e.target.value)} /></label><label>Temperature (°C)<input type="number" step="0.1" value={form.temperatureC} onChange={e => update("temperatureC", e.target.value)} /></label><label>SpO₂ (%)<input type="number" min="0" max="100" value={form.spo2Percent} onChange={e => update("spo2Percent", e.target.value)} /></label><label className="span-two">Symptoms<textarea rows="3" value={form.symptoms} onChange={e => update("symptoms", e.target.value)} /></label><label className="span-two">Clinical notes<textarea rows="3" value={form.notes} onChange={e => update("notes", e.target.value)} /></label>{error && <div className="form-error span-two">{error}</div>}<button className="button button-primary span-two" disabled={busy}>{busy ? "Submitting observations…" : "Submit for risk assessment"}</button></form></section>{assessment && <section className="panel assessment-panel"><span className="eyebrow">PRELIMINARY CLINICAL RISK ASSESSMENT</span><h2>Recommended priority: <span className={"pill priority-" + String(assessment.recommendedPriority).toLowerCase()}>{assessment.recommendedPriority}</span></h2><p>{(assessment.findings || []).join(" · ") || "No additional findings returned."}</p><div className="notice notice-warning">This is a decision-support recommendation, not a diagnosis or a substitute for clinical judgement. Review according to facility protocol.</div></section>}</>;
+
+  async function loadPatientRecords(event) {
+    if (event) event.preventDefault();
+    setLookupBusy(true); setError(""); setNotice(""); setRecords([]);
+    try {
+      const observations = await api("/triage/patients/" + Number(lookupId) + "/observations");
+      const enriched = await Promise.all(observations.map(async observation => ({
+        observation,
+        assessments: await api("/triage/observations/" + observation.id + "/assessments"),
+      })));
+      setRecords(enriched);
+      if (!enriched.length) setNotice("No triage observations were found for this patient.");
+    } catch (err) { setError(err.message); }
+    finally { setLookupBusy(false); }
+  }
+
+  async function review(assessmentId, status) {
+    const notes = (reviewNotes[assessmentId] || "").trim();
+    if (!notes) { setError("Clinician notes are required before submitting a review."); return; }
+    if (status === "OVERRIDDEN" && !reviewPriority[assessmentId]) { setError("Choose a confirmed priority when overriding a recommendation."); return; }
+    setReviewBusy(assessmentId); setError(""); setNotice("");
+    try {
+      await api("/triage/assessments/" + assessmentId + "/review", {
+        method: "PATCH",
+        body: { reviewedById: staff.id, reviewStatus: status, confirmedPriority: status === "OVERRIDDEN" ? reviewPriority[assessmentId] : null, clinicianNotes: notes },
+      });
+      setNotice("Clinical assessment review saved.");
+      await loadPatientRecords();
+    } catch (err) { setError(err.message); }
+    finally { setReviewBusy(null); }
+  }
+
+  return <>
+    <PageHeading title="Clinical triage" description="Record observations and review preliminary risk assessments. Clinical decisions remain with qualified staff." />
+    {canRecord && <section className="panel form-panel">
+      <div className="panel-heading"><div><h2>Record observations</h2><p>Enter the patient and available vital signs</p></div></div>
+      <form className="form-grid" onSubmit={submit}>
+        <label>Patient ID<input type="number" min="1" required value={form.patientId} onChange={e => update("patientId", e.target.value)} /></label>
+        <label>Queue ticket ID<input type="number" min="1" value={form.queueTicketId} onChange={e => update("queueTicketId", e.target.value)} /></label>
+        <label>Systolic BP (mmHg)<input type="number" min="1" value={form.systolicBp} onChange={e => update("systolicBp", e.target.value)} /></label>
+        <label>Diastolic BP (mmHg)<input type="number" min="1" value={form.diastolicBp} onChange={e => update("diastolicBp", e.target.value)} /></label>
+        <label>Heart rate (bpm)<input type="number" min="1" max="300" value={form.heartRate} onChange={e => update("heartRate", e.target.value)} /></label>
+        <label>Respiratory rate (/min)<input type="number" min="1" max="100" value={form.respiratoryRate} onChange={e => update("respiratoryRate", e.target.value)} /></label>
+        <label>Temperature (°C)<input type="number" min="25" max="45" step="0.1" value={form.temperatureC} onChange={e => update("temperatureC", e.target.value)} /></label>
+        <label>SpO₂ (%)<input type="number" min="0" max="100" value={form.spo2Percent} onChange={e => update("spo2Percent", e.target.value)} /></label>
+        <label className="span-two">Symptoms<textarea rows="3" value={form.symptoms} onChange={e => update("symptoms", e.target.value)} /></label>
+        <label className="span-two">Clinical notes<textarea rows="3" value={form.notes} onChange={e => update("notes", e.target.value)} /></label>
+        <button className="button button-primary span-two" disabled={busy}>{busy ? "Submitting observations…" : "Submit for risk assessment"}</button>
+      </form>
+    </section>}
+    {canReview && <section className="panel form-panel">
+      <div className="panel-heading"><div><h2>Clinician review</h2><p>Load a patient's previous triage observations and review pending recommendations.</p></div></div>
+      <form className="lookup-form" onSubmit={loadPatientRecords}>
+        <label>Patient ID<input type="number" min="1" required value={lookupId} onChange={e => setLookupId(e.target.value)} /></label>
+        <button className="button button-outline" disabled={lookupBusy || !lookupId}>{lookupBusy ? "Loading…" : "Load assessments"}</button>
+      </form>
+      {records.map(({ observation, assessments }) => <article className="review-record" key={observation.id}>
+        <div className="review-record-heading"><b>Observation #{observation.id}</b><small>{observation.measuredAt ? new Date(observation.measuredAt).toLocaleString() : "Date not recorded"}</small></div>
+        <p className="review-vitals">BP {observation.systolicBp ?? "—"}/{observation.diastolicBp ?? "—"} · HR {observation.heartRate ?? "—"} · SpO₂ {observation.spo2Percent ?? "—"}%</p>
+        {assessments.map(item => <div className="review-assessment" key={item.id}>
+          <div><span className={"pill priority-" + String(item.recommendedPriority).toLowerCase()}>{item.recommendedPriority}</span><span className="review-status">{item.reviewStatus}</span></div>
+          <p>{(item.findings || []).join(" · ") || "No additional findings returned."}</p>
+          {item.reviewStatus === "PENDING" ? <div className="review-controls">
+            <label>Clinician notes<textarea rows="2" value={reviewNotes[item.id] || ""} onChange={e => setReviewNotes(v => ({ ...v, [item.id]: e.target.value }))} /></label>
+            <label>Confirmed priority (required only when overriding)<select value={reviewPriority[item.id] || ""} onChange={e => setReviewPriority(v => ({ ...v, [item.id]: e.target.value }))}><option value="">Select if overriding</option><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="EMERGENCY">Emergency</option></select></label>
+            <div className="review-buttons"><button className="button button-outline" disabled={reviewBusy === item.id} onClick={() => review(item.id, "CONFIRMED")}>Confirm recommendation</button><button className="button button-primary" disabled={reviewBusy === item.id} onClick={() => review(item.id, "OVERRIDDEN")}>Override priority</button></div>
+          </div> : <p className="review-notes">Review notes: {item.clinicianNotes || "No notes supplied."}</p>}
+        </div>)}
+      </article>)}
+    </section>}
+    {error && <div className="form-error">{error}</div>}
+    {notice && <div className="notice">{notice}</div>}
+    {assessment && <section className="panel assessment-panel"><span className="eyebrow">PRELIMINARY CLINICAL RISK ASSESSMENT</span><h2>Recommended priority: <span className={"pill priority-" + String(assessment.recommendedPriority).toLowerCase()}>{assessment.recommendedPriority}</span></h2><p>{(assessment.findings || []).join(" · ") || "No additional findings returned."}</p><div className="notice notice-warning">This is a decision-support recommendation, not a diagnosis or a substitute for clinical judgement. Review according to facility protocol.</div></section>}
+  </>;
 }
 
 function numberOrNull(value) { return value === "" ? null : Number(value); }
