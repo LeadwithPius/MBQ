@@ -29,6 +29,9 @@ public class ClinicalRiskAssessment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewed_by_id")
     private StaffUser reviewedBy;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmed_priority", length = 20)
+    private PriorityLevel confirmedPriority;
     @Column(name = "clinician_notes", columnDefinition = "TEXT") private String clinicianNotes;
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -51,6 +54,8 @@ public class ClinicalRiskAssessment {
     public void setReviewStatus(ReviewStatus v) { reviewStatus = v; }
     public StaffUser getReviewedBy() { return reviewedBy; }
     public void setReviewedBy(StaffUser v) { reviewedBy = v; }
+    public PriorityLevel getConfirmedPriority() { return confirmedPriority; }
+    public void setConfirmedPriority(PriorityLevel v) { confirmedPriority = v; }
     public String getClinicianNotes() { return clinicianNotes; }
     public void setClinicianNotes(String v) { clinicianNotes = v; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
