@@ -115,8 +115,9 @@ function useDepartmentQueue() {
 }
 
 function useElapsedClock() {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(null);
   useEffect(() => {
+    setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 15000);
     return () => window.clearInterval(timer);
   }, []);
@@ -218,7 +219,7 @@ function PriorityBadge({ priority }) {
   return <span className={"pill priority-badge " + config.className}><Icon size={13} aria-hidden="true" />{config.label}</span>;
 }
 
-function QueueTable({ rows, loading, now = Date.now(), onPatient }) {
+function QueueTable({ rows, loading, now, onPatient }) {
   if (loading && !rows.length) return <div className="queue-skeleton" aria-label="Loading queue">{[1,2,3,4].map(item => <div className="skeleton-row" key={item}><i /><i /><i /><i /></div>)}</div>;
   if (!rows.length) return <div className="queue-empty-state"><span><ClipboardList size={24} /></span><h3>No patients waiting</h3><p>New queue tickets will appear here when patients are registered.</p></div>;
   return <div className="table-wrap"><table className="data-table dashboard-queue-table"><thead><tr><th>Ticket</th><th>Patient</th><th>Priority</th><th>Waiting</th><th>Status</th><th>Open</th></tr></thead><tbody>{rows.map(row => {
@@ -232,6 +233,7 @@ export function QueuePage() {
   const { staff } = useAuth();
   const navigate = useNavigate();
   const { queue, loading, error, refresh } = useDepartmentQueue();
+  const now = useElapsedClock();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function callNext() {
@@ -240,7 +242,7 @@ export function QueuePage() {
     catch (err) { setMessage(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} onPatient={() => navigate("/app/patients")} /></section></>;
+  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={(staff?.role === "ADMIN" || staff?.role === "DOCTOR") ? <button className="button button-primary" disabled={busy || !staff?.departmentId} onClick={callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{message && <div className="notice">{message}</div>}<section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={queue} loading={loading || busy} now={now} onPatient={() => navigate("/app/patients")} /></section></>;
 }
 
 export function PatientsPage() {
