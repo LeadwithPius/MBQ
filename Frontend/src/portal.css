@@ -1093,3 +1093,86 @@
   .data-table td { font-size: 12px; }
   .staff-profile { min-height: 76px; }
 }
+
+
+/* Dashboard operations workspace */
+.dashboard-heading-actions { display:flex; align-items:center; gap:12px; }
+.updated-label { display:inline-flex; align-items:center; gap:8px; color:#64766b; font-size:12px; white-space:nowrap; }
+.dashboard-primary-action {
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+  margin:0 0 20px; padding:19px 22px; border:1px solid #dce9e1;
+  border-radius:14px; background:linear-gradient(110deg,#fff 0%,#f0f8f2 100%);
+}
+.dashboard-primary-action > div { display:flex; flex-direction:column; gap:5px; }
+.dashboard-primary-action strong { color:#183c2b; font-size:19px; }
+.dashboard-primary-action small { color:#718276; font-size:12px; }
+.dashboard-primary-action .eyebrow { color:#6c8977; }
+.dashboard-primary-action .button { min-height:48px; padding:0 20px; }
+.dashboard-stat-grid { margin-bottom:20px; }
+.stat-card.stat-alert-active { border-color:#f1d0ca; background:linear-gradient(135deg,#fff 0%,#fff5f3 100%); animation:statAttention 2.8s ease-in-out infinite; }
+.stat-card.stat-alert-active .stat-icon.red { background:#fde5e1; color:#b42318; }
+.stat-card.stat-alert-active .stat-icon.amber { background:#fff0d4; color:#995b00; }
+@keyframes statAttention { 0%,100% { box-shadow:0 3px 12px #172b4308; } 50% { box-shadow:0 5px 18px #b4231818; } }
+.dashboard-queue-panel { max-width:100%; overflow:hidden; }
+.dashboard-queue-heading { align-items:flex-end; gap:18px; }
+.queue-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.queue-controls label { display:flex; align-items:center; gap:7px; color:#65776c; font-size:12px; font-weight:700; }
+.queue-controls select { min-height:37px; padding:0 28px 0 10px; border:1px solid #dfe8e1; border-radius:8px; background:#fff; color:#304b3b; font-size:12px; }
+.dashboard-queue-table { min-width:760px; }
+.dashboard-queue-table tbody tr { transition:background .15s ease; }
+.dashboard-queue-table tbody tr:hover { background:#f7faf8; }
+.patient-row-link { display:block; padding:0; border:0; background:transparent; color:#1d5437; font-weight:750; text-align:left; }
+.patient-row-link:hover { text-decoration:underline; }
+.queue-patient-id { display:block; margin-top:4px; color:#819087; font-size:10px; }
+.priority-badge { display:inline-flex; align-items:center; gap:6px; min-height:27px; padding:4px 9px; font-weight:800; }
+.priority-badge.priority-emergency { border:1px solid #f3c6c0; background:#fff0ee; color:#ad2118; }
+.priority-badge.priority-urgent { border:1px solid #f0d8a9; background:#fff7e8; color:#895600; }
+.priority-badge.priority-normal { border:1px solid #dfe5e1; background:#f1f4f2; color:#53645a; }
+.wait-time { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:750; white-space:nowrap; }
+.wait-normal { color:#536b5c; }
+.wait-warning { color:#946000; }
+.wait-critical { color:#b42318; }
+.queue-status { font-size:10px; font-weight:800; }
+.queue-status.status-waiting { background:#edf3ff; color:#2859a8; }
+.queue-status.status-in_progress { background:#e9f5ef; color:#17633d; }
+.queue-status.status-completed { background:#edf2ef; color:#53645a; }
+.queue-empty-state { min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:35px 20px; text-align:center; }
+.queue-empty-state > span { width:52px; height:52px; display:grid; place-items:center; border-radius:16px; background:#edf5ef; color:#34734c; }
+.queue-empty-state h3 { margin:15px 0 5px; color:#294635; font-size:16px; }
+.queue-empty-state p { margin:0; color:#78877e; font-size:12px; }
+.queue-skeleton { padding:12px 0; }
+.skeleton-row { min-height:55px; display:grid; grid-template-columns:1fr 2fr 1fr 1fr; align-items:center; gap:18px; padding:0 15px; border-bottom:1px solid #edf1ee; }
+.skeleton-row i { height:11px; border-radius:8px; background:linear-gradient(90deg,#edf1ee 25%,#f7f9f7 50%,#edf1ee 75%); background-size:200% 100%; animation:skeletonShimmer 1.4s ease-in-out infinite; }
+@keyframes skeletonShimmer { to { background-position:-200% 0; } }
+.dashboard-lower-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; margin-top:20px; }
+.dashboard-info-panel { min-width:0; }
+.dashboard-info-panel .panel-heading > svg { color:#6b8876; }
+.attention-message { display:flex; align-items:flex-start; gap:9px; margin:12px 0 0; padding:12px; border-radius:9px; background:#f1f7f2; color:#42624d; font-size:12px; line-height:1.6; }
+.attention-message svg { flex:0 0 17px; margin-top:1px; }
+.emergency-message { background:#fff0ee; color:#a3261d; }
+.urgent-message { background:#fff7e8; color:#895600; }
+.workspace-details { margin:4px 0 0; }
+.workspace-details > div { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #edf1ee; }
+.workspace-details > div:last-child { border-bottom:0; }
+.workspace-details dt { color:#78877e; font-size:12px; }
+.workspace-details dd { margin:0; color:#304b3b; font-size:12px; font-weight:750; text-align:right; }
+.logout-confirm { position:absolute; z-index:20; right:8px; bottom:80px; width:230px; display:flex; flex-wrap:wrap; gap:8px; padding:13px; border:1px solid #ffffff30; border-radius:12px; background:#063d29; box-shadow:0 12px 30px #0003; color:#fff; }
+.logout-confirm span { width:100%; font-size:12px; }
+.logout-confirm button { min-height:32px; padding:0 10px; border:1px solid #ffffff35; border-radius:7px; background:#ffffff12; color:#fff; font-size:11px; }
+.logout-confirm button:last-child { background:#fff; color:#17432c; }
+@media (max-width:900px) {
+  .dashboard-queue-heading { align-items:flex-start; flex-direction:column; }
+  .dashboard-lower-grid { grid-template-columns:1fr; }
+}
+@media (max-width:560px) {
+  .dashboard-heading-actions { align-items:flex-end; flex-direction:column; gap:7px; }
+  .dashboard-primary-action { align-items:flex-start; flex-direction:column; }
+  .dashboard-primary-action .button { width:100%; }
+  .queue-controls { width:100%; }
+  .queue-controls label { flex:1; align-items:flex-start; flex-direction:column; }
+  .queue-controls select { width:100%; }
+  .dashboard-lower-grid { gap:12px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .stat-card.stat-alert-active, .skeleton-row i { animation:none; }
+}
