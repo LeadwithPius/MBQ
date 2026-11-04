@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
 import { ROLE_ACCESS } from "../roleAccess";
+import { chooseDepartment, useActiveDepartment } from "../context/activeDepartment";
 
 const links = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, roles: ROLE_ACCESS.QUEUE },
@@ -55,8 +56,42 @@ export function WorkspaceLayout() {
         {confirmLogout && <div className="logout-confirm" role="dialog" aria-label="Confirm sign out"><span>Sign out of this workstation?</span><button onClick={() => setConfirmLogout(false)}>Stay</button><button onClick={() => { logout(); navigate("/login", { replace: true }); }}>Sign out</button></div>}
       </div></div>
     </aside>
-    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><b>{staff?.departmentName || (staff?.departmentId ? "Department " + staff.departmentId : "Hospital operations")}</b></div><div className="topbar-user"><span className="status-pip" /> Clinical workspace</div></header><div className="workspace-content"><Outlet /></div></main>
+    <main className="workspace-main"><header className="workspace-topbar"><button className="mobile-menu-button" onClick={() => setMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div><span className="topbar-overline">MBQ WORKSPACE</span><TopbarDepartment /></div><div className="topbar-user"><span className="status-pip" /> Clinical workspace</div></header><div className="workspace-content"><Outlet /></div></main>
   </div>;
+}
+
+/** Department name in the top bar; admin gets a dropdown to choose which department to work in. */
+function TopbarDepartment() {
+  const { departmentId, departmentName, canChoose } = useActiveDepartment();
+  const [departments, setDepartments] = useState([]);
+
+  useEffect(() => {
+    if (!canChoose) return undefined;
+    let active = true;
+    api("/departments")
+      .then(list => {
+        if (!active || !Array.isArray(list)) return;
+        setDepartments(list);
+        // First visit: start on the first department so the queue isn't empty.
+        if (list.length && !list.some(d => d.id === departmentId)) {
+          chooseDepartment({ id: list[0].id, name: list[0].name, facilityId: list[0].facilityId });
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [canChoose, departmentId]);
+
+  if (!canChoose) return <b>{departmentName || (departmentId ? "Department " + departmentId : "Hospital operations")}</b>;
+  return <label className="topbar-department-picker">
+    <span className="sr-only">Department</span>
+    <select value={departmentId ?? ""} onChange={e => {
+      const d = departments.find(item => item.id === Number(e.target.value));
+      chooseDepartment(d ? { id: d.id, name: d.name, facilityId: d.facilityId } : null);
+    }}>
+      {departmentId == null && <option value="">Choose a department…</option>}
+      {departments.map(d => <option key={d.id} value={d.id}>{d.name}{departments.some(o => o.facilityId !== d.facilityId) ? " · " + d.facilityName : ""}</option>)}
+    </select>
+  </label>;
 }
 
 function PageHeading({ eyebrow = "HOSPITAL OPERATIONS", title, description, action }) {
@@ -64,8 +99,7 @@ function PageHeading({ eyebrow = "HOSPITAL OPERATIONS", title, description, acti
 }
 
 function useDepartmentQueue() {
-  const { staff } = useAuth();
-  const departmentId = staff?.departmentId;
+  const { departmentId, canChoose } = useActiveDepartment();
   const [queue, setQueue] = useState([]);
   const [serving, setServing] = useState([]);
   const [loading, setLoading] = useState(Boolean(departmentId));
@@ -119,7 +153,7 @@ function useDepartmentQueue() {
 
   return {
     queue, serving, loading,
-    error: departmentId ? error : "Your staff account is not assigned to a department.",
+    error: departmentId ? error : canChoose ? "Choose a department in the top bar to see its queue." : "Your staff account is not assigned to a department.",
     refresh, departmentId, lastUpdated,
   };
 }
@@ -168,6 +202,7 @@ function orderedQueue(rows, sortBy = "priority") {
 /** Queue actions shared by the dashboard and the queue page. */
 function useQueueActions(refresh) {
   const { staff } = useAuth();
+  const { departmentId } = useActiveDepartment();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -193,7 +228,7 @@ function useQueueActions(refresh) {
     canTriage: TRIAGE_RECORD_ROLES.includes(role),
     canFinish: FINISH_TICKET_ROLES.includes(role),
     callNext: () => run(
-      () => api("/queue/departments/" + staff.departmentId + "/call-next", { method: "POST" }),
+      () => api("/queue/departments/" + departmentId + "/call-next", { method: "POST" }),
       called => (called?.patientName ? called.patientName + " has been called." : "The next patient has been called.")),
     toggleBlood: row => run(
       () => api("/queue/tickets/" + row.id + "/priority", { method: "PATCH", body: { priorityLevel: row.priorityLevel, requiresBlood: !row.requiresBlood } }),
@@ -220,7 +255,8 @@ export function DashboardPage() {
   const urgent = queue.filter(item => item.priorityLevel === "URGENT").length;
   const longestWait = queue.reduce((max, item) => Math.max(max, waitMinutes(item.timeIssued, now) ?? 0), 0);
   const visibleRows = orderedQueue(queue.filter(item => priorityFilter === "ALL" || item.priorityLevel === priorityFilter), sortBy);
-  const departmentLabel = staff?.departmentName || (staff?.departmentId ? "Department " + staff.departmentId : "Department not assigned");
+  const { departmentId: activeDepartmentId, departmentName } = useActiveDepartment();
+  const departmentLabel = departmentName || (activeDepartmentId ? "Department " + activeDepartmentId : "Department not assigned");
 
   return <>
     <PageHeading eyebrow="WORKSPACE" title="Overview" description={"Good to see you, " + (staff?.name || "staff member") + ". Here is your department's live queue."} action={<div className="dashboard-heading-actions"><span className="updated-label"><span className="status-pip" />{relativeAge(lastUpdated, now)}</span><button className="button button-outline" onClick={refresh} disabled={loading} aria-label="Refresh queue"><RefreshCw size={16} /> Refresh</button></div>} />
@@ -243,7 +279,7 @@ export function DashboardPage() {
     </section>
     <section className="dashboard-lower-grid">
       <article className="panel dashboard-info-panel"><div className="panel-heading"><div><h2>Queue attention</h2><p>Operational items requiring awareness</p></div><ShieldAlert size={19} /></div>{emergency > 0 ? <p className="attention-message emergency-message"><AlertTriangle size={17} /> {emergency} emergency-priority patient{emergency === 1 ? "" : "s"} waiting. Review immediately under facility protocol.</p> : <p className="attention-message"><CheckCircle2 size={17} /> No emergency-priority patients currently waiting.</p>}{urgent > 0 && <p className="attention-message urgent-message"><AlertTriangle size={17} /> {urgent} urgent-priority patient{urgent === 1 ? "" : "s"} waiting.</p>}</article>
-      <article className="panel dashboard-info-panel"><div className="panel-heading"><div><h2>Workspace details</h2><p>Current staff session</p></div><ClipboardList size={19} /></div><dl className="workspace-details"><div><dt>Staff member</dt><dd>{staff?.name || "Not available"}</dd></div><div><dt>Role</dt><dd>{staff?.role || "Not available"}</dd></div><div><dt>Department</dt><dd>{staff?.departmentName || (staff?.departmentId ? "Department " + staff.departmentId : "Not assigned")}</dd></div></dl></article>
+      <article className="panel dashboard-info-panel"><div className="panel-heading"><div><h2>Workspace details</h2><p>Current staff session</p></div><ClipboardList size={19} /></div><dl className="workspace-details"><div><dt>Staff member</dt><dd>{staff?.name || "Not available"}</dd></div><div><dt>Role</dt><dd>{staff?.role || "Not available"}</dd></div><div><dt>Department</dt><dd>{departmentLabel}</dd></div></dl></article>
     </section>
   </>;
 }
@@ -291,17 +327,17 @@ function QueueTable({ rows, loading, now, actions }) {
 }
 
 export function QueuePage() {
-  const { staff } = useAuth();
-  const { queue, serving, loading, error, refresh } = useDepartmentQueue();
+  const { queue, serving, loading, error, refresh, departmentId } = useDepartmentQueue();
   const actions = useQueueActions(refresh);
   const now = useElapsedClock();
-  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={actions.canCallNext ? <button className="button button-primary" disabled={actions.busy || !staff?.departmentId || queue.length === 0} onClick={actions.callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{actions.message && <div className="notice">{actions.message}</div>}<NowServingPanel rows={serving} actions={actions} /><section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department, emergency first</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={orderedQueue(queue)} loading={loading} now={now} actions={actions} /></section></>;
+  return <><PageHeading title="Queue management" description="Monitor waiting tickets and coordinate patient flow." action={actions.canCallNext ? <button className="button button-primary" disabled={actions.busy || !departmentId || queue.length === 0} onClick={actions.callNext}>Call next patient</button> : null} />{error && <div className="notice notice-warning">{error}</div>}{actions.message && <div className="notice">{actions.message}</div>}<NowServingPanel rows={serving} actions={actions} /><section className="panel"><div className="panel-heading"><div><h2>Waiting patients</h2><p>{queue.length} ticket(s) waiting in your department, emergency first</p></div><button className="button button-outline" onClick={refresh}>Refresh</button></div><QueueTable rows={orderedQueue(queue)} loading={loading} now={now} actions={actions} /></section></>;
 }
 
 export function PatientsPage() {
   const { staff } = useAuth();
   const [searchParams] = useSearchParams();
   const highlightId = Number(searchParams.get("patientId")) || null;
+  const { departmentId, facilityId } = useActiveDepartment();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -341,10 +377,10 @@ export function PatientsPage() {
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
-      const patient = await api("/patients", { method: "POST", body: { ...form, age: form.age === "" ? null : Number(form.age), bloodGroup: form.bloodGroup || null, facilityId: Number(form.facilityId || staff?.facilityId) } });
+      const patient = await api("/patients", { method: "POST", body: { ...form, age: form.age === "" ? null : Number(form.age), bloodGroup: form.bloodGroup || null, facilityId: Number(form.facilityId || facilityId) } });
       try {
-        if (!staff?.departmentId) throw new Error("Patient registered, but no department is assigned to your account, so a queue ticket was not created.");
-        await api("/queue/tickets", { method: "POST", body: { patientId: patient.id, departmentId: staff.departmentId, priorityLevel: "NORMAL", requiresBlood: false } });
+        if (!departmentId) throw new Error("Patient registered, but no department is selected, so a queue ticket was not created.");
+        await api("/queue/tickets", { method: "POST", body: { patientId: patient.id, departmentId, priorityLevel: "NORMAL", requiresBlood: false } });
         setNotice("Patient registered and added to your department queue.");
       } catch (ticketError) { setNotice("Patient registered successfully. Queue ticket not created: " + ticketError.message); }
       setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
@@ -352,7 +388,7 @@ export function PatientsPage() {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
-  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column">{(["ADMIN", "RECEPTIONIST"].includes(staff?.role)) ? <section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details</p></div></div><form className="form-grid" onSubmit={submit}>{staff?.role === "ADMIN" && !staff?.facilityId && <label className="span-two">Facility ID<input type="number" min="1" required value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })} /></label>}<label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}<button className="button button-primary span-two" disabled={busy || !(form.facilityId || staff?.facilityId)}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section> : <section className="panel"><div className="empty-panel">Your staff role does not have permission to register patients. You can still view your facility's patient directory.</div></section>}<section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div id={"patient-" + p.id} className={"patient-list-row" + (p.id === highlightId ? " patient-list-row-highlight" : "")} key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
+  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column">{(["ADMIN", "RECEPTIONIST"].includes(staff?.role)) ? <section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details</p></div></div><form className="form-grid" onSubmit={submit}>{staff?.role === "ADMIN" && !facilityId && <label className="span-two">Facility ID<input type="number" min="1" required value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })} /></label>}<label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}<button className="button button-primary span-two" disabled={busy || !(form.facilityId || facilityId)}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section> : <section className="panel"><div className="empty-panel">Your staff role does not have permission to register patients. You can still view your facility's patient directory.</div></section>}<section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div id={"patient-" + p.id} className={"patient-list-row" + (p.id === highlightId ? " patient-list-row-highlight" : "")} key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
 }
 
 export function TriagePage() {
