@@ -160,6 +160,7 @@ Created automatically on an empty database. Password for all: `Password123!` (de
 | --- | --- | --- |
 | `admin` | Admin | none (system-wide) |
 | `doctor`, `nurse`, `receptionist` | Doctor, Nurse, Receptionist | OPD |
+| `lab_staff` | Lab staff (blood bank) | OPD |
 | `emergency.doctor`, `emergency.nurse`, `emergency.receptionist` | Doctor, Nurse, Receptionist | Emergency |
 | `maternity.doctor`, `maternity.nurse`, `maternity.receptionist` | Doctor, Nurse, Receptionist | Maternity |
 
