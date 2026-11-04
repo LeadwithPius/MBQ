@@ -6,7 +6,7 @@ import { useAuth } from "../context/useAuth";
 import { ROLE_ACCESS } from "../roleAccess";
 
 const links = [
-  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, roles: ROLE_ACCESS.WORKSPACE },
+  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, roles: ROLE_ACCESS.QUEUE },
   { to: "/app/patients", label: "Patients", icon: Users, roles: ROLE_ACCESS.PATIENTS },
   { to: "/app/queue", label: "Queue management", icon: ClipboardList, roles: ROLE_ACCESS.QUEUE },
   { to: "/app/triage", label: "Clinical triage", icon: Stethoscope, roles: ROLE_ACCESS.TRIAGE },
@@ -195,6 +195,9 @@ function useQueueActions(refresh) {
     callNext: () => run(
       () => api("/queue/departments/" + staff.departmentId + "/call-next", { method: "POST" }),
       called => (called?.patientName ? called.patientName + " has been called." : "The next patient has been called.")),
+    toggleBlood: row => run(
+      () => api("/queue/tickets/" + row.id + "/priority", { method: "PATCH", body: { priorityLevel: row.priorityLevel, requiresBlood: !row.requiresBlood } }),
+      row.patientName + (row.requiresBlood ? ": blood request cleared." : " flagged as needing blood. The blood bank can see this request.")),
     changePriority: (row, priorityLevel) => run(
       () => api("/queue/tickets/" + row.id + "/priority", { method: "PATCH", body: { priorityLevel } }),
       row.patientName + " is now " + priorityLevel.toLowerCase() + " priority."),
@@ -283,7 +286,7 @@ function QueueTable({ rows, loading, now, actions }) {
     const waitTone = minutes === null ? "" : minutes >= 30 ? "wait-critical" : minutes >= 15 ? "wait-warning" : "wait-normal";
     return <tr key={row.id} className="queue-data-row"><td><b>{row.ticketNumber}</b></td><td><button className="patient-row-link" onClick={() => actions.openPatient(row)}>{row.patientName || "Patient record"}</button><small className="queue-patient-id">Patient #{row.patientId}</small></td><td>{actions.canPrioritize
       ? <select className="priority-select" aria-label={"Priority for " + (row.patientName || "patient")} value={row.priorityLevel} disabled={actions.busy} onChange={e => actions.changePriority(row, e.target.value)}><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="EMERGENCY">Emergency</option></select>
-      : <PriorityBadge priority={row.priorityLevel} />}</td><td><span className={"wait-time " + waitTone}>{minutes === null ? "—" : "Waiting " + minutes + " min"}</span></td><td><span className={"pill queue-status status-" + String(row.status).toLowerCase()}>{row.status?.replace("_", " ")}</span></td><td className="queue-row-actions">{actions.canTriage && <button className="table-action" onClick={() => actions.openTriage(row)}>Triage</button>}<button className="table-action" onClick={() => actions.openPatient(row)}>View patient</button></td></tr>;
+      : <PriorityBadge priority={row.priorityLevel} />}</td><td><span className={"wait-time " + waitTone}>{minutes === null ? "—" : "Waiting " + minutes + " min"}</span></td><td><span className={"pill queue-status status-" + String(row.status).toLowerCase()}>{row.status?.replace("_", " ")}</span></td><td className="queue-row-actions">{actions.canTriage && <button className="table-action" onClick={() => actions.openTriage(row)}>Triage</button>}{actions.canPrioritize && <button className={"table-action" + (row.requiresBlood ? " table-action-blood" : "")} disabled={actions.busy} aria-pressed={row.requiresBlood} onClick={() => actions.toggleBlood(row)}><Droplet size={11} /> {row.requiresBlood ? "Needs blood" : "Flag blood"}</button>}<button className="table-action" onClick={() => actions.openPatient(row)}>View patient</button></td></tr>;
   })}</tbody></table></div>;
 }
 
