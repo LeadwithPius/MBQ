@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/blood-bank/inventory")
-@PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
 public class BloodInventoryController {
 
     private final BloodInventoryService inventoryService;
@@ -20,15 +19,19 @@ public class BloodInventoryController {
         this.inventoryService = inventoryService;
     }
 
+    /** Receiving stock is a lab job. */
     @PostMapping("/batches")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'LAB_STAFF')")
     public InventoryOperationResponse receiveBatch(
             @Valid @RequestBody ReceiveBatchRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         return inventoryService.receive(request, idempotencyKey);
     }
 
+    /** Lab staff issue units; doctors may issue directly in an emergency. */
     @PostMapping("/issues")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LAB_STAFF', 'DOCTOR')")
     public InventoryOperationResponse issue(
             @Valid @RequestBody IssueRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {

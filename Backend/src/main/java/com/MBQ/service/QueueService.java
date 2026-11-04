@@ -199,9 +199,15 @@ public class QueueService {
         PriorityLevel previousPriority = ticket.getPriorityLevel();
         PriorityLevel newPriority = request.priorityLevel();
         ticket.setPriorityLevel(newPriority);
+        if (request.requiresBlood() != null) {
+            ticket.setRequiresBlood(request.requiresBlood());
+        }
         QueueTicket saved = queueTicketRepository.saveAndFlush(ticket);
 
         String note = "Priority changed from " + previousPriority + " to " + newPriority;
+        if (request.requiresBlood() != null) {
+            note = note + (request.requiresBlood() ? "; blood requested" : "; blood request cleared");
+        }
         String extra = trimToNull(request.notes());
         if (extra != null) {
             note = note + ": " + extra;

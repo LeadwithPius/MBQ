@@ -36,6 +36,14 @@ public interface QueueTicketRepository
             @Param("status") TicketStatus status
     );
 
+    /** Active tickets flagged as needing blood, across all facilities (admin). */
+    List<QueueTicket> findByRequiresBloodTrueAndStatusInOrderByTimeIssuedAsc(
+            Collection<TicketStatus> statuses);
+
+    /** Active tickets flagged as needing blood in one facility. */
+    List<QueueTicket> findByRequiresBloodTrueAndStatusInAndDepartment_Facility_IdOrderByTimeIssuedAsc(
+            Collection<TicketStatus> statuses, Long facilityId);
+
     /** True if the patient already has a ticket in one of these statuses. */
     boolean existsByPatient_IdAndStatusIn(Long patientId, Collection<TicketStatus> statuses);
 

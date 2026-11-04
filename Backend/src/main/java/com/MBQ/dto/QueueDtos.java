@@ -83,7 +83,10 @@ public final class QueueDtos {
             PriorityLevel priorityLevel,
 
             @Size(max = 255)
-            String notes
+            String notes,
+
+            /** Optional: true/false flags whether the patient needs blood; null leaves it unchanged. */
+            Boolean requiresBlood
     ) {
     }
 

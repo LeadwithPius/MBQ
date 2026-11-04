@@ -24,6 +24,16 @@ public interface BloodStockBatchRepository extends JpaRepository<BloodStockBatch
         """)
     List<BloodStockBatch> findEligibleBatchesForUpdate(@Param("stockId") Long stockId);
 
+    /** All batches of a stock, soonest expiry first (legacy batches without expiry last). */
+    @Query("""
+        SELECT batch
+        FROM BloodStockBatch batch
+        WHERE batch.stock.id = :stockId
+        ORDER BY CASE WHEN batch.expiryDate IS NULL THEN 1 ELSE 0 END,
+                 batch.expiryDate ASC, batch.id ASC
+        """)
+    List<BloodStockBatch> findAllForStock(@Param("stockId") Long stockId);
+
     Optional<BloodStockBatch> findByStockIdAndBatchReference(
         Long stockId,
         String batchReference

@@ -100,10 +100,11 @@ class QueueServiceTest {
         when(staffAccess.currentStaff()).thenReturn(nurse);
 
         TicketResponse response = queueService.updateTicketPriority(
-                1L, new UpdatePriorityRequest(PriorityLevel.EMERGENCY, "Severe bleeding"));
+                1L, new UpdatePriorityRequest(PriorityLevel.EMERGENCY, "Severe bleeding", true));
 
         assertEquals(PriorityLevel.EMERGENCY, response.priorityLevel());
         assertEquals(TicketStatus.WAITING, response.status());
+        assertEquals(true, response.requiresBlood());
         verify(historyRepository).save(any(QueueTicketStatusHistory.class));
     }
 
@@ -114,7 +115,7 @@ class QueueServiceTest {
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> queueService.updateTicketPriority(
-                        1L, new UpdatePriorityRequest(PriorityLevel.URGENT, null)));
+                        1L, new UpdatePriorityRequest(PriorityLevel.URGENT, null, null)));
 
         assertEquals(409, error.getStatusCode().value());
         assertEquals(PriorityLevel.NORMAL, completed.getPriorityLevel());
