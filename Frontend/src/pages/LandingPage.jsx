@@ -1,5 +1,4 @@
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   ClipboardList,
@@ -9,7 +8,6 @@ import {
   FileText,
   ShieldCheck,
   Stethoscope,
-  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 

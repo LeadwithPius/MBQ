@@ -1254,3 +1254,18 @@
   .mbq-step-content h3 { margin:3px 0 6px; }
   .mbq-public-cta { width:calc(100% - 36px); }
 }
+
+/* ---- fix/demo-blockers: now serving, queue row actions, patient highlight ---- */
+.now-serving-panel .panel-heading svg{color:var(--teal)}
+.now-serving-list{display:flex;flex-direction:column;gap:10px}
+.now-serving-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid #e3f1ee;border-radius:10px;background:#f6fbfa}
+.now-serving-who{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px;color:#53657a}
+.now-serving-who b{color:#263b53}
+.now-serving-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.now-serving-actions input{min-width:220px;min-height:40px;padding:8px 11px;border:1px solid #dfe7ef;border-radius:7px;background:#fff;font-size:11px}
+.now-serving-actions .button{min-height:40px;font-size:11px}
+.now-serving-note{color:#8b99aa;font-size:10px}
+.queue-row-actions{display:flex;gap:6px}
+.priority-select{min-height:30px;padding:4px 8px;border:1px solid #dce6f2;border-radius:6px;background:#fff;color:#33465c;font-size:10px;font-weight:700}
+.patient-list-row-highlight{background:#edf3ff;border-radius:9px;padding-left:10px;padding-right:10px;box-shadow:inset 3px 0 0 var(--blue)}
+@media(max-width:560px){.now-serving-actions input{min-width:0;width:100%}}
