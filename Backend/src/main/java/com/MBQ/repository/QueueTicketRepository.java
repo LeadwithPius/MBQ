@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,17 @@ public interface QueueTicketRepository
             @Param("departmentId") Long departmentId,
             @Param("status") TicketStatus status
     );
+
+    /** Active tickets flagged as needing blood, across all facilities (admin). */
+    List<QueueTicket> findByRequiresBloodTrueAndStatusInOrderByTimeIssuedAsc(
+            Collection<TicketStatus> statuses);
+
+    /** Active tickets flagged as needing blood in one facility. */
+    List<QueueTicket> findByRequiresBloodTrueAndStatusInAndDepartment_Facility_IdOrderByTimeIssuedAsc(
+            Collection<TicketStatus> statuses, Long facilityId);
+
+    /** True if the patient already has a ticket in one of these statuses. */
+    boolean existsByPatient_IdAndStatusIn(Long patientId, Collection<TicketStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

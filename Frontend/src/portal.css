@@ -1254,3 +1254,57 @@
   .mbq-step-content h3 { margin:3px 0 6px; }
   .mbq-public-cta { width:calc(100% - 36px); }
 }
+
+/* ---- fix/demo-blockers: now serving, queue row actions, patient highlight ---- */
+.now-serving-panel .panel-heading svg{color:var(--teal)}
+.now-serving-list{display:flex;flex-direction:column;gap:10px}
+.now-serving-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid #e3f1ee;border-radius:10px;background:#f6fbfa}
+.now-serving-who{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px;color:#53657a}
+.now-serving-who b{color:#263b53}
+.now-serving-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.now-serving-actions input{min-width:220px;min-height:40px;padding:8px 11px;border:1px solid #dfe7ef;border-radius:7px;background:#fff;font-size:11px}
+.now-serving-actions .button{min-height:40px;font-size:11px}
+.now-serving-note{color:#8b99aa;font-size:10px}
+.queue-row-actions{display:flex;gap:6px}
+.priority-select{min-height:30px;padding:4px 8px;border:1px solid #dce6f2;border-radius:6px;background:#fff;color:#33465c;font-size:10px;font-weight:700}
+.patient-list-row-highlight{background:#edf3ff;border-radius:9px;padding-left:10px;padding-right:10px;box-shadow:inset 3px 0 0 var(--blue)}
+@media(max-width:560px){.now-serving-actions input{min-width:0;width:100%}}
+
+/* ---- feature/blood-bank ---- */
+.blood-low-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;margin:0 0 12px;border:1px solid #f6c9c6;border-radius:10px;background:#fff3f2;color:#9f2f2b;font-size:12px}
+.blood-low-alert>span{flex:1;min-width:220px}
+.blood-low-alert .button{min-height:36px;font-size:11px}
+.blood-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.blood-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;color:var(--ink);transition:.15s}
+.blood-card:hover{border-color:#b9cdf3;box-shadow:0 6px 16px #1d36500f}
+.blood-card-group{font-size:22px;font-weight:800;letter-spacing:-.5px;color:#b0302b}
+.blood-card strong{font-size:26px;letter-spacing:-.6px}
+.blood-card strong small{font-size:11px;font-weight:600;color:#8291a4;letter-spacing:0}
+.blood-card-meta{font-size:10px;color:#7a8a9d}
+.blood-card-meta em{font-style:normal;color:#a76d14;font-weight:700}
+.blood-card-low{border-color:#f3c2bf;background:#fffafa}
+.blood-card-selected{border-color:var(--blue);box-shadow:0 0 0 3px #e3ecff}
+.blood-detail .panel-heading{align-items:flex-start}
+.threshold-form{display:flex;align-items:flex-end;gap:8px}
+.threshold-form label{display:flex;flex-direction:column;gap:5px;color:#53657a;font-size:10px;font-weight:700}
+.threshold-form input{width:90px;min-height:38px;padding:6px 9px;border:1px solid #dfe7ef;border-radius:7px}
+.blood-forms{margin-bottom:8px}
+.blood-form{align-content:start;padding:15px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe}
+.blood-form h3{display:flex;align-items:center;gap:7px;margin:0;font-size:13px}
+.blood-form-hint{margin:0;color:#7a8a9d;font-size:10px;line-height:1.6}
+.blood-subheading{margin:20px 0 10px;font-size:13px}
+.donor-filter{display:flex;align-items:center;gap:6px;color:#53657a;font-size:10px;font-weight:700}
+.donor-filter select{min-height:32px;padding:4px 8px;border:1px solid #dfe7ef;border-radius:6px;background:#fff}
+.checkbox-label{flex-direction:row!important;align-items:center;gap:8px!important;align-self:end;min-height:41px}
+.checkbox-label input{width:auto!important;min-height:0!important}
+.donor-list{margin-top:14px;max-height:340px;overflow:auto}
+.alert-list{display:flex;flex-direction:column}
+.alert-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef2f6}
+.alert-row:last-child{border:0}
+.alert-row-text{flex:1;display:flex;flex-direction:column;gap:4px}
+.alert-row-text b{font-size:12px}
+.alert-row-text small{color:#8c9aab;font-size:10px}
+.alert-row-actions{display:flex;gap:6px}
+.table-action-blood{border-color:#f3c2bf;background:#fff3f2;color:#b0302b}
+@media(max-width:1100px){.blood-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.blood-grid{grid-template-columns:1fr 1fr;gap:8px}.blood-card{padding:12px}.threshold-form{width:100%}}
