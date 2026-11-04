@@ -44,6 +44,10 @@ public interface QueueTicketRepository
     List<QueueTicket> findByRequiresBloodTrueAndStatusInAndDepartment_Facility_IdOrderByTimeIssuedAsc(
             Collection<TicketStatus> statuses, Long facilityId);
 
+    /** Every ticket issued in [from, to), oldest first (daily report). */
+    List<QueueTicket> findByTimeIssuedGreaterThanEqualAndTimeIssuedLessThanOrderByTimeIssuedAsc(
+            java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     /** True if the patient already has a ticket in one of these statuses. */
     boolean existsByPatient_IdAndStatusIn(Long patientId, Collection<TicketStatus> statuses);
 
