@@ -101,3 +101,73 @@ Java JDK 17+
 Maven 3.8+
 Node.js 18+ and npm
 PostgreSQL 14+
+
+## Run locally
+
+### 1. Create the database (once)
+
+In `psql` as the `postgres` user:
+
+```sql
+CREATE USER mbq_user WITH PASSWORD 'choose_a_password';
+CREATE DATABASE mbq OWNER mbq_user;
+```
+
+Flyway creates all tables on the first start.
+
+### 2. Set the environment variables
+
+The backend will not start without `DB_PASSWORD` and `JWT_SECRET`. `JWT_SECRET` must be Base64 and decode to at least 32 bytes.
+
+Windows PowerShell (for the current terminal window):
+
+```powershell
+$env:DB_PASSWORD = "choose_a_password"
+$env:JWT_SECRET  = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+macOS / Linux / Git Bash:
+
+```bash
+export DB_PASSWORD=choose_a_password
+export JWT_SECRET=$(openssl rand -base64 48)
+```
+
+Optional: `DB_URL` (default `jdbc:postgresql://localhost:5432/mbq`), `DB_USERNAME` (default `mbq_user`), `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`).
+
+### 3. Start the backend
+
+```bash
+cd Backend
+./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
+```
+
+### 4. Start the frontend
+
+```bash
+cd Frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173.
+
+### Demo accounts
+
+Created automatically on an empty database. Password for all: `Password123!` (development only).
+
+| Username | Role | Department |
+| --- | --- | --- |
+| `admin` | Admin | none (system-wide) |
+| `doctor`, `nurse`, `receptionist` | Doctor, Nurse, Receptionist | OPD |
+| `emergency.doctor`, `emergency.nurse`, `emergency.receptionist` | Doctor, Nurse, Receptionist | Emergency |
+| `maternity.doctor`, `maternity.nurse`, `maternity.receptionist` | Doctor, Nurse, Receptionist | Maternity |
+
+### Tests
+
+```bash
+cd Backend
+./mvnw clean test             # Windows: .\mvnw.cmd clean test
+```
+
+Unit tests always run. `MbqApplicationTests` and `PasswordVerificationTest` start the whole app, so they only run when `JWT_SECRET` is set and PostgreSQL is running; otherwise they are skipped.
