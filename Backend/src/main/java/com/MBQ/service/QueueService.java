@@ -18,6 +18,7 @@ import com.MBQ.dto.QueueDtos.PatientRegistrationRequest;
 import com.MBQ.dto.QueueDtos.PatientResponse;
 import com.MBQ.dto.QueueDtos.TicketHistoryResponse;
 import com.MBQ.dto.QueueDtos.TicketResponse;
+import com.MBQ.dto.QueueDtos.UpdatePriorityRequest;
 import com.MBQ.dto.QueueDtos.UpdateTicketStatusRequest;
 import com.MBQ.model.Department;
 import com.MBQ.model.Facility;
@@ -35,6 +36,10 @@ import com.MBQ.repository.QueueTicketStatusHistoryRepository;
 
 @Service
 public class QueueService {
+
+    /** Statuses that mean the patient is still in the queue. */
+    private static final List<TicketStatus> ACTIVE_STATUSES =
+            List.of(TicketStatus.WAITING, TicketStatus.IN_PROGRESS);
 
     private final PatientRepository patientRepository;
     private final FacilityRepository facilityRepository;
@@ -99,6 +104,13 @@ public class QueueService {
                     "The patient and department must belong to the same facility");
         }
 
+        // One active ticket per patient: finish or cancel the current one first.
+        if (queueTicketRepository.existsByPatient_IdAndStatusIn(patient.getId(), ACTIVE_STATUSES)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This patient already has an active queue ticket");
+        }
+
         LocalDate issueDate = LocalDate.now();
         Integer sequenceNumber = jdbcTemplate.queryForObject(
                 """
@@ -147,14 +159,59 @@ public class QueueService {
 
     @Transactional(readOnly = true)
     public List<TicketResponse> getWaitingQueue(Long departmentId) {
+        return getQueueByStatus(departmentId, TicketStatus.WAITING);
+    }
+
+    /** Patients currently with a doctor ("now serving"). */
+    @Transactional(readOnly = true)
+    public List<TicketResponse> getInProgressQueue(Long departmentId) {
+        return getQueueByStatus(departmentId, TicketStatus.IN_PROGRESS);
+    }
+
+    private List<TicketResponse> getQueueByStatus(Long departmentId, TicketStatus status) {
         Department department = requireDepartment(departmentId);
         staffAccess.requireDepartmentAccess(department);
 
-        return queueTicketRepository.findQueueByDepartmentAndStatus(
-                        departmentId, TicketStatus.WAITING)
+        return queueTicketRepository.findQueueByDepartmentAndStatus(departmentId, status)
                 .stream()
                 .map(this::toTicketResponse)
                 .toList();
+    }
+
+    /**
+     * Triage flags a ticket's priority by hand (FR4). Only while the patient is
+     * still in the queue. The change is written to the ticket's history.
+     */
+    @Transactional
+    public TicketResponse updateTicketPriority(Long ticketId, UpdatePriorityRequest request) {
+        QueueTicket ticket = queueTicketRepository.findByIdForUpdate(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Queue ticket not found"));
+
+        staffAccess.requireTicketDepartmentAccess(ticket);
+
+        if (!ACTIVE_STATUSES.contains(ticket.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Priority can only be changed while the ticket is waiting or in progress");
+        }
+
+        PriorityLevel previousPriority = ticket.getPriorityLevel();
+        PriorityLevel newPriority = request.priorityLevel();
+        ticket.setPriorityLevel(newPriority);
+        QueueTicket saved = queueTicketRepository.saveAndFlush(ticket);
+
+        String note = "Priority changed from " + previousPriority + " to " + newPriority;
+        String extra = trimToNull(request.notes());
+        if (extra != null) {
+            note = note + ": " + extra;
+        }
+        if (note.length() > 255) {
+            note = note.substring(0, 255);
+        }
+        recordStatusChange(saved, saved.getStatus(), saved.getStatus(), note);
+
+        return toTicketResponse(saved);
     }
 
     @Transactional

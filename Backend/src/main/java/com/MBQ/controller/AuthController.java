@@ -79,6 +79,10 @@ public AuthDtos.LoginResponse login(
                 ? null
                 : staff.getDepartment().getId();
 
+        String departmentName = staff.getDepartment() == null
+                ? null
+                : staff.getDepartment().getName();
+
         Long facilityId = staff.getDepartment() == null
                 || staff.getDepartment().getFacility() == null
                 ? null
@@ -90,6 +94,7 @@ public AuthDtos.LoginResponse login(
                 staff.getUsername(),
                 staff.getRole().name(),
                 departmentId,
+                departmentName,
                 facilityId);
 
         return new AuthDtos.LoginResponse(

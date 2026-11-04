@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,9 @@ public interface QueueTicketRepository
             @Param("departmentId") Long departmentId,
             @Param("status") TicketStatus status
     );
+
+    /** True if the patient already has a ticket in one of these statuses. */
+    boolean existsByPatient_IdAndStatusIn(Long patientId, Collection<TicketStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

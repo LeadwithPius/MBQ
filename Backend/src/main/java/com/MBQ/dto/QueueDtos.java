@@ -77,6 +77,16 @@ public final class QueueDtos {
     ) {
     }
 
+    /** Manual priority change by triage (FR4). */
+    public record UpdatePriorityRequest(
+            @NotNull
+            PriorityLevel priorityLevel,
+
+            @Size(max = 255)
+            String notes
+    ) {
+    }
+
     public record TicketResponse(
             Long id,
             String ticketNumber,

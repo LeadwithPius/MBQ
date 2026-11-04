@@ -25,6 +25,7 @@ public final class AuthDtos {
             String username,
             String role,
             Long departmentId,
+            String departmentName,
             Long facilityId) {
     }
 }

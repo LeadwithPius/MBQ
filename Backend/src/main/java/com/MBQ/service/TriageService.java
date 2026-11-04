@@ -16,6 +16,7 @@ import com.MBQ.model.Patient;
 import com.MBQ.model.PriorityLevel;
 import com.MBQ.model.QueueTicket;
 import com.MBQ.model.StaffUser;
+import com.MBQ.model.TicketStatus;
 import com.MBQ.model.TriageObservation;
 import com.MBQ.repository.ClinicalRiskAssessmentRepository;
 import com.MBQ.repository.PatientRepository;
@@ -227,6 +228,17 @@ public class TriageService {
         assessment.setConfirmedPriority(confirmedPriority);
         assessment.setClinicianNotes(request.clinicianNotes().trim());
         assessment.setReviewedAt(reviewedAt);
+
+        // The clinician's decision is final: apply it to the linked queue ticket,
+        // up or down, while the patient is still in the queue.
+        QueueTicket linkedTicket = assessment.getObservation().getQueueTicket();
+        if (linkedTicket != null
+                && (linkedTicket.getStatus() == TicketStatus.WAITING
+                || linkedTicket.getStatus() == TicketStatus.IN_PROGRESS)
+                && linkedTicket.getPriorityLevel() != confirmedPriority) {
+            linkedTicket.setPriorityLevel(confirmedPriority);
+            tickets.save(linkedTicket);
+        }
 
         // Persist the final decision and immutable audit snapshot in one transaction.
         ClinicalRiskAssessment saved = assessments.save(assessment);

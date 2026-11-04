@@ -33,8 +33,8 @@ public class DataSeeder {
             facilities.save(facility);
 
             Department opd = createDepartment(departments, facility, "OPD");
-            createDepartment(departments, facility, "Emergency");
-            createDepartment(departments, facility, "Maternity");
+            Department emergency = createDepartment(departments, facility, "Emergency");
+            Department maternity = createDepartment(departments, facility, "Maternity");
 
             for (Role role : Role.values()) {
                 StaffUser user = new StaffUser();
@@ -46,6 +46,21 @@ public class DataSeeder {
                 // Administrators are intentionally not tied to a clinical department.
                 user.setDepartment(role == Role.ADMIN ? null : opd);
                 users.save(user);
+            }
+
+            // Clinical staff for the other departments, so their queues can be demonstrated too.
+            // Usernames: emergency.doctor, emergency.nurse, maternity.receptionist, ...
+            for (Department department : new Department[] {emergency, maternity}) {
+                for (Role role : new Role[] {Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST}) {
+                    String prefix = department.getName().toLowerCase();
+                    StaffUser user = new StaffUser();
+                    user.setName(department.getName() + " " + role.name());
+                    user.setUsername(prefix + "." + role.name().toLowerCase());
+                    user.setPasswordHash(encoder.encode("Password123!"));
+                    user.setRole(role);
+                    user.setDepartment(department);
+                    users.save(user);
+                }
             }
 
             for (BloodGroup bloodGroup : BloodGroup.values()) {
