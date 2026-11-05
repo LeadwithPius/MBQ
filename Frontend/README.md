@@ -4,7 +4,7 @@ The React application has a public landing page and a JWT-protected staff worksp
 
 ## Run locally
 
-1. Start PostgreSQL and the Spring Boot backend on port 8080.
+1. Start PostgreSQL and the Spring Boot backend on port 8081.
 2. From this directory run:
 
    ```bash
@@ -14,7 +14,7 @@ The React application has a public landing page and a JWT-protected staff worksp
 
 3. Open http://localhost:5173.
 
-Vite proxies requests beginning with `/api` to `http://localhost:8080`. Override the target with `MBQ_API_TARGET` if needed.
+Vite proxies requests beginning with `/api` to `http://localhost:8081`. Override the target with `MBQ_API_TARGET` if needed.
 
 For a separately hosted API, set `VITE_API_BASE_URL` to the full API base, including `/api`, for example `https://api.example.org/api`.
 
