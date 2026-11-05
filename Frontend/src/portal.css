@@ -1308,3 +1308,35 @@
 .table-action-blood{border-color:#f3c2bf;background:#fff3f2;color:#b0302b}
 @media(max-width:1100px){.blood-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.blood-grid{grid-template-columns:1fr 1fr;gap:8px}.blood-card{padding:12px}.threshold-form{width:100%}}
+
+/* ---- fix/final-gaps: admin department picker, reports ---- */
+.topbar-department-picker select{min-height:30px;padding:3px 26px 3px 8px;border:1px solid #dce6f2;border-radius:7px;background:#fff;color:var(--ink);font-size:12px;font-weight:700}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.report-actions{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
+.report-date{display:flex;flex-direction:column;gap:5px;color:#53657a;font-size:10px;font-weight:700}
+.report-date input{min-height:43px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.report-meta{margin:-10px 0 16px;color:#718198;font-size:12px}
+.report-loading{opacity:.55}
+.stat-icon.teal{background:#e8f8f5;color:#159b8e}
+.report-bar-row{display:grid;grid-template-columns:96px 1fr 32px;align-items:center;gap:10px;margin-bottom:10px}
+.report-bar{height:10px;border-radius:6px;background:#eef2f6;overflow:hidden}
+.report-bar i{display:block;height:100%;border-radius:6px;background:#9aa9bb}
+.report-bar-emergency{background:#d6524c!important}
+.report-bar-urgent{background:#e0a03a!important}
+.report-bar-row b{text-align:right;font-size:12px}
+.report-subheading{margin:18px 0 8px;font-size:12px}
+.report-chips{display:flex;flex-wrap:wrap;gap:8px}
+.report-chip{padding:6px 10px;border:1px solid var(--line);border-radius:7px;font-size:11px;color:#53657a}
+.report-note{margin:14px 0 0;color:#7a8a9d;font-size:11px}
+.report-figures{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}
+.report-figures div{padding:14px;border:1px solid var(--line);border-radius:10px}
+.report-figures dt{color:#8291a4;font-size:10px}
+.report-figures dd{margin:6px 0 0;font-size:22px;font-weight:800}
+.report-stock{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.report-stock-cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;border:1px solid var(--line);border-radius:10px}
+.report-stock-cell b{color:#b0302b;font-size:15px}
+.report-stock-cell span{font-size:20px;font-weight:800}
+.report-stock-cell small{color:#b0302b;font-size:9px;font-weight:800}
+.report-stock-low{border-color:#f3c2bf;background:#fff6f5}
+@media(max-width:800px){.report-stock{grid-template-columns:repeat(4,1fr)}}
+@media print{.workspace-sidebar,.workspace-topbar,.report-actions{display:none!important}.workspace-main{margin-left:0!important}.panel{break-inside:avoid;box-shadow:none}}

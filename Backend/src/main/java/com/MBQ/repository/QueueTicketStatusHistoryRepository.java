@@ -10,4 +10,8 @@ public interface QueueTicketStatusHistoryRepository
 
     List<QueueTicketStatusHistory>
     findByTicket_IdOrderByChangedAtAscIdAsc(Long ticketId);
+
+    /** Status history of several tickets at once, oldest first (daily report wait times). */
+    List<QueueTicketStatusHistory> findByTicket_IdInOrderByChangedAtAscIdAsc(
+            java.util.Collection<Long> ticketIds);
 }

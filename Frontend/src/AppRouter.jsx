@@ -1,11 +1,14 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+// Keep the ".jsx": on Windows "AuthContext" and "authContext" are the same file name,
+// so without it the import resolves to authContext.js and the app shows a white screen.
+import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/useAuth";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import { BloodBankPage } from "./pages/BloodBank";
+import { ReportsPage } from "./pages/Reports";
 import {
-  WorkspaceLayout, DashboardPage, PatientsPage, QueuePage, TriagePage, ComingSoonPage,
+  WorkspaceLayout, DashboardPage, PatientsPage, QueuePage, TriagePage,
 } from "./pages/Workspace";
 import "./portal.css";
 import { ROLE_ACCESS } from "./roleAccess";
@@ -41,7 +44,7 @@ function AppRoutes() {
           <Route path="queue" element={<RequireRoles roles={ROLE_ACCESS.QUEUE}><QueuePage /></RequireRoles>} />
           <Route path="triage" element={<RequireRoles roles={ROLE_ACCESS.TRIAGE}><TriagePage /></RequireRoles>} />
           <Route path="blood-bank" element={<RequireRoles roles={ROLE_ACCESS.BLOOD_BANK}><BloodBankPage /></RequireRoles>} />
-          <Route path="reports" element={<RequireRoles roles={ROLE_ACCESS.REPORTS}><ComingSoonPage title="Reports" description="Reporting endpoints have not yet been exposed by the backend. No sample figures are shown here." /></RequireRoles>} />
+          <Route path="reports" element={<RequireRoles roles={ROLE_ACCESS.REPORTS}><ReportsPage /></RequireRoles>} />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Route>
       </Route>

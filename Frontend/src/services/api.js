@@ -23,6 +23,7 @@ export function saveSession(session) {
 
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem("mbq.adminDepartment");
 }
 
 export async function api(path, options = {}) {
