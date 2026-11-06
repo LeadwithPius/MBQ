@@ -57,7 +57,7 @@ export function ConsultationPage() {
   const [patientHistory, setPatientHistory] = useState([]);
   const [consultation, setConsultation] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -85,10 +85,7 @@ export function ConsultationPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     if (!departmentId) {
-      setTickets([]);
-      setLoading(false);
       return () => { active = false; };
     }
     api("/queue/departments/" + departmentId + "/in-progress")
