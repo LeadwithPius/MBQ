@@ -97,13 +97,7 @@ class ConsultationServiceTest {
         consultation.setTreatmentPlan("Review and manage symptoms");
 
         // An ID marks this as an existing draft owned by this doctor.
-        try {
-            var id = Consultation.class.getDeclaredField("id");
-            id.setAccessible(true);
-            id.set(consultation, 55L);
-        } catch (ReflectiveOperationException error) {
-            throw new AssertionError(error);
-        }
+        consultation.setId(55L);
 
         when(consultations.findById(55L)).thenReturn(Optional.of(consultation));
         when(staffAccess.currentStaff()).thenReturn(doctor);
