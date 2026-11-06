@@ -23,9 +23,9 @@ This is a planning aid, not a clinical recommendation. Validate the baseline aga
 3. Add stock reconciliation reports and controlled compensating adjustments.
 4. Expand verification audit metadata (verifier, timestamp, checks performed) and separation-of-duties policy.
 5. Add forecasting backtests, error metrics, seasonality, confidence intervals, minimum-history policy and model versioning before replacing the baseline with a trained model.
-6. Add integration tests against PostgreSQL for V9, facility isolation, batch verification and concurrent inventory operations.
+6. Add integration tests against PostgreSQL for V10, facility isolation, batch verification and concurrent inventory operations.
 7. Add real notification-provider integration only after donor consent, delivery tracking, retry and opt-out are implemented.
 
 ## Local verification
 
-Run backend tests and frontend lint/build after pulling this branch. Apply Flyway V9 on a test database first; do not use a production database for initial verification.
+Run backend tests and frontend lint/build after pulling this branch. Apply Flyway V10 on a test database first; do not use a production database for initial verification.
