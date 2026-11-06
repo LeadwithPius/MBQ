@@ -163,7 +163,8 @@ public class BloodBankService {
 
         List<AlertResponse> created = new ArrayList<>();
         int skipped = 0;
-        for (Donor donor : donors.findByFacilityIdAndBloodGroupAndEligibleTrueOrderByNameAsc(\n                stock.getFacility().getId(), stock.getBloodGroup())) {
+        for (Donor donor : donors.findByFacilityIdAndBloodGroupAndEligibleTrueOrderByNameAsc(
+                stock.getFacility().getId(), stock.getBloodGroup())) {
             if (alerts.existsByStock_IdAndDonor_IdAndResponseStatus(stock.getId(), donor.getId(), PENDING)) {
                 skipped++;
                 continue;
