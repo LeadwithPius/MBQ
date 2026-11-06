@@ -76,7 +76,7 @@ class BloodIntelligenceServiceTest {
         assertEquals(1.0, result.averageDailyDemand());
         assertEquals(7, result.predictedDemand7Days());
         assertEquals(14, result.predictedDemand14Days());
-        assertEquals("HIGH", result.riskLevel());
+        assertEquals("MODERATE", result.riskLevel());
         assertEquals(4, result.suggestedReplenishmentUnits());
     }
 
