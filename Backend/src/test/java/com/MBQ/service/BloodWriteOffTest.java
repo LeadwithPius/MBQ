@@ -75,7 +75,7 @@ class BloodWriteOffTest {
         batch.setOpeningQuantity(5);
         batch.setRemainingQuantity(5);
 
-        when(staffAccess.currentStaff()).thenReturn(new StaffUser());
+        when(staffAccess.currentStaff()).thenReturn(new StaffUser() {{ setId(20L); }});
         when(batches.findById(30L)).thenReturn(Optional.of(batch));
         when(stocks.findByIdForUpdate(8L)).thenReturn(Optional.of(stock));
         when(batches.findByIdForUpdate(30L)).thenReturn(Optional.of(batch));
