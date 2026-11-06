@@ -54,6 +54,7 @@ export function ConsultationPage() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [observations, setObservations] = useState([]);
+  const [patientHistory, setPatientHistory] = useState([]);
   const [consultation, setConsultation] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
@@ -120,12 +121,14 @@ export function ConsultationPage() {
     setError("");
     setNotice("");
     setObservations([]);
+    setPatientHistory([]);
     setConsultation(null);
     setForm(EMPTY_FORM);
     try {
-      const [saved, triage] = await Promise.all([
+      const [saved, triage, history] = await Promise.all([
         api("/consultations/tickets/" + ticket.id),
         api("/triage/patients/" + ticket.patientId + "/observations"),
+        api("/consultations/patients/" + ticket.patientId),
       ]);
       if (saved && typeof saved === "object") {
         setConsultation(saved);
@@ -141,7 +144,8 @@ export function ConsultationPage() {
           followUp: saved.followUp || "",
         });
       }
-      setObservations(Array.isArray(triage) ? triage : []);
+      setObservations(Array.isArray(triage) ? triage.filter(item => item.queueTicketId === ticket.id) : []);
+      setPatientHistory(Array.isArray(history) ? history.filter(item => item.queueTicketId !== ticket.id) : []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -261,7 +265,7 @@ export function ConsultationPage() {
                 <div className="consultation-section-title"><Activity size={16} /><h3>Nurse triage information</h3></div>
                 {selectedTicket.triageNotes && <p className="consultation-triage-note">{selectedTicket.triageNotes}</p>}
                 {observations.length === 0
-                  ? <p className="consultation-muted">No triage observations have been recorded for this patient yet.</p>
+                  ? <p className="consultation-muted">No triage observations have been recorded for this queue visit yet.</p>
                   : observations.map(item => (
                     <article className="consultation-observation" key={item.id}>
                       <div className="consultation-observation-heading">
@@ -276,6 +280,15 @@ export function ConsultationPage() {
                     </article>
                   ))}
               </section>
+
+              {patientHistory.length > 0 && <details className="consultation-history">
+                <summary>Previous consultations ({patientHistory.length})</summary>
+                {patientHistory.map(item => <article key={item.id} className="consultation-history-item">
+                  <div><b>{item.diagnosis || "Consultation record"}</b><small>{item.createdAt ? new Date(item.createdAt).toLocaleString() : "Date not recorded"} · {item.status}</small></div>
+                  <p>{item.treatmentPlan || "No treatment plan recorded."}</p>
+                  {item.followUp && <p><b>Follow-up:</b> {item.followUp}</p>}
+                </article>)}
+              </details>}
 
               <form className="consultation-form" onSubmit={saveDraft}>
                 <div className="consultation-section-title"><ClipboardList size={16} /><h3>Clinical consultation notes</h3></div>
