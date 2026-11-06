@@ -34,6 +34,10 @@ public interface BloodStockBatchRepository extends JpaRepository<BloodStockBatch
         """)
     List<BloodStockBatch> findAllForStock(@Param("stockId") Long stockId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT batch FROM BloodStockBatch batch WHERE batch.id = :id")
+    Optional<BloodStockBatch> findByIdForUpdate(@Param("id") Long id);
+
     Optional<BloodStockBatch> findByStockIdAndBatchReference(
         Long stockId,
         String batchReference

@@ -22,6 +22,8 @@ import com.MBQ.dto.BloodInventoryDtos.BatchAllocation;
 import com.MBQ.dto.BloodInventoryDtos.InventoryOperationResponse;
 import com.MBQ.dto.BloodInventoryDtos.IssueRequest;
 import com.MBQ.dto.BloodInventoryDtos.ReceiveBatchRequest;
+import com.MBQ.dto.BloodInventoryDtos.WriteOffRequest;
+import com.MBQ.dto.BloodInventoryDtos.WriteOffType;
 import com.MBQ.model.BloodBatchVerificationStatus;
 import com.MBQ.model.BloodInventoryOperation;
 import com.MBQ.model.BloodInventoryOperationType;
@@ -220,6 +222,93 @@ public class BloodInventoryService {
         InventoryOperationResponse response = new InventoryOperationResponse(
                 claim.operationId(), "ISSUE", stock.getId(), request.units(),
                 before, after, List.copyOf(allocations), false);
+        completeOperation(claim.operationId(), response);
+        return response;
+    }
+
+    /**
+     * Write off expired or wasted units so the stock total matches what is physically usable.
+     * Same idempotency and locking rules as receive/issue; stock can never go negative.
+     */
+    @Transactional
+    public InventoryOperationResponse writeOff(WriteOffRequest request, String idempotencyKey) {
+        validateIdempotencyKey(idempotencyKey);
+        if (request == null || request.batchId() == null || request.type() == null || blank(request.reason())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A batch, write-off type and reason are required.");
+        }
+
+        StaffUser actor = staffAccess.currentStaff();
+        BloodStockBatch unlocked = batches.findById(request.batchId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+        // Lock order matches issue(): stock first, then batch.
+        BloodStock stock = lockStock(unlocked.getStock().getId());
+        staffAccess.requireFacilityAccess(stock.getFacility().getId());
+        BloodStockBatch batch = batches.findByIdForUpdate(request.batchId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+
+        boolean expiredType = request.type() == WriteOffType.EXPIRED;
+        String fingerprint = fingerprint(
+                "WRITE_OFF|" + request.type() + "|" + request.batchId() + "|"
+                + (expiredType ? "ALL" : String.valueOf(request.units())) + "|" + request.reason().trim());
+        BloodInventoryOperationType opType = expiredType
+                ? BloodInventoryOperationType.EXPIRE : BloodInventoryOperationType.WASTE;
+
+        OperationClaim claim = claimOperation(idempotencyKey, fingerprint, opType, actor);
+        if (!claim.created()) {
+            return replay(claim, fingerprint, opType);
+        }
+
+        int remaining = batch.getRemainingQuantity();
+        if (remaining < 1) {
+            throw conflict("This batch has no units left to write off.");
+        }
+        int units;
+        if (expiredType) {
+            if (batch.getExpiryDate() == null || !batch.getExpiryDate().isBefore(LocalDate.now())) {
+                throw conflict("Only a batch past its expiry date can be written off as expired.");
+            }
+            units = remaining;
+        } else {
+            if (request.units() == null || request.units() < 1 || request.units() > remaining) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Wasted units must be between 1 and " + remaining + " for this batch.");
+            }
+            units = request.units();
+        }
+
+        int before = stock.getUnitsAvailable();
+        if (before < units) {
+            throw new IllegalStateException("Batch balances exceed aggregate stock. Reconciliation is required.");
+        }
+        int after = before - units;
+
+        batch.setRemainingQuantity(remaining - units);
+        batches.save(batch);
+        stock.setUnitsAvailable(after);
+        stocks.save(stock);
+
+        BloodInventoryOperation operation = operations.findById(claim.operationId())
+                .orElseThrow(() -> new IllegalStateException("Inventory operation disappeared"));
+        BloodStockMovement movement = new BloodStockMovement();
+        movement.setStock(stock);
+        movement.setBatch(batch);
+        movement.setMovementType(expiredType ? BloodStockMovementType.EXPIRED : BloodStockMovementType.WASTED);
+        movement.setUnitsChanged(units);
+        movement.setQuantityBefore(before);
+        movement.setQuantityAfter(after);
+        movement.setReason(request.reason().trim());
+        movement.setRecordedBy(actor);
+        movement.setCreatedAt(LocalDateTime.now());
+        movement.setIdempotencyKey(idempotencyKey);
+        movement.setRequestFingerprint(fingerprint);
+        movement.setOperation(operation);
+        movements.save(movement);
+
+        InventoryOperationResponse response = new InventoryOperationResponse(
+                claim.operationId(), expiredType ? "EXPIRE" : "WASTE", stock.getId(), units, before, after,
+                List.of(new BatchAllocation(batch.getId(), batch.getBatchReference(), batch.getExpiryDate(), units)),
+                false);
         completeOperation(claim.operationId(), response);
         return response;
     }

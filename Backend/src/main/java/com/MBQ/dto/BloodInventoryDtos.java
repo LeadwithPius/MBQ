@@ -30,6 +30,20 @@ public final class BloodInventoryDtos {
             Long patientId
     ) {}
 
+    /**
+     * Remove units that can no longer be used. EXPIRED writes off everything left in an
+     * expired batch (units is ignored); WASTED removes the given units (broken bag, failed
+     * crossmatch storage, etc.) from any batch.
+     */
+    public record WriteOffRequest(
+            @NotNull Long batchId,
+            @NotNull WriteOffType type,
+            Integer units,
+            @NotBlank @Size(max = 500) String reason
+    ) {}
+
+    public enum WriteOffType { EXPIRED, WASTED }
+
     public record BatchAllocation(
             Long batchId,
             String batchReference,
