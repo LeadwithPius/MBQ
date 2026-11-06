@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X, FileText } from "lucide-react";
 import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
@@ -11,6 +11,7 @@ const links = [
   { to: "/app/patients", label: "Patients", icon: Users, roles: ROLE_ACCESS.PATIENTS },
   { to: "/app/queue", label: "Queue management", icon: ClipboardList, roles: ROLE_ACCESS.QUEUE },
   { to: "/app/triage", label: "Clinical triage", icon: Stethoscope, roles: ROLE_ACCESS.TRIAGE },
+  { to: "/app/consultations", label: "Consultations", icon: FileText, roles: ROLE_ACCESS.CONSULTATIONS },
   { to: "/app/blood-bank", label: "Blood bank", icon: Droplet, roles: ROLE_ACCESS.BLOOD_BANK },
   { to: "/app/reports", label: "Reports", icon: Activity, roles: ROLE_ACCESS.REPORTS },
 ];
