@@ -109,7 +109,7 @@ class BloodBankServiceTest {
         Donor alreadyAlerted = donor(1L, "Mwila Chanda");
         Donor fresh = donor(2L, "Bupe Mulenga");
         when(stocks.findById(8L)).thenReturn(Optional.of(oNeg));
-        when(donors.findByBloodGroupAndEligibleTrueOrderByNameAsc(BloodGroup.O_NEG))
+        when(donors.findByFacilityIdAndBloodGroupAndEligibleTrueOrderByNameAsc(1L, BloodGroup.O_NEG))
                 .thenReturn(List.of(alreadyAlerted, fresh));
         when(alerts.existsByStock_IdAndDonor_IdAndResponseStatus(8L, 1L, "PENDING")).thenReturn(true);
         when(alerts.existsByStock_IdAndDonor_IdAndResponseStatus(8L, 2L, "PENDING")).thenReturn(false);

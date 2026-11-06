@@ -124,9 +124,16 @@ public class BloodBankService {
 
     @Transactional(readOnly = true)
     public List<DonorResponse> listDonors(BloodGroup bloodGroup) {
-        List<Donor> found = bloodGroup == null
-                ? donors.findAllByOrderByNameAsc()
-                : donors.findByBloodGroupOrderByNameAsc(bloodGroup);
+        StaffUser staff = staffAccess.currentStaff();
+        List<Donor> found;
+        if (staffAccess.isAdmin(staff)) {
+            found = bloodGroup == null ? donors.findAllByOrderByNameAsc()
+                    : donors.findByBloodGroupOrderByNameAsc(bloodGroup);
+        } else {
+            Long facilityId = staffAccess.facilityIdOf(staff);
+            found = bloodGroup == null ? donors.findAllByFacilityIdOrderByNameAsc(facilityId)
+                    : donors.findByFacilityIdAndBloodGroupOrderByNameAsc(facilityId, bloodGroup);
+        }
         return found.stream().map(BloodBankService::toDonor).toList();
     }
 
@@ -137,6 +144,12 @@ public class BloodBankService {
         donor.setBloodGroup(request.bloodGroup());
         donor.setContact(trimToNull(request.contact()));
         donor.setEligible(request.eligible() == null || request.eligible());
+        StaffUser actor = staffAccess.currentStaff();
+        if (actor.getDepartment() == null || actor.getDepartment().getFacility() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Select a facility-scoped staff account to register a donor.");
+        }
+        donor.setFacility(actor.getDepartment().getFacility());
         return toDonor(donors.save(donor));
     }
 
@@ -150,7 +163,8 @@ public class BloodBankService {
 
         List<AlertResponse> created = new ArrayList<>();
         int skipped = 0;
-        for (Donor donor : donors.findByBloodGroupAndEligibleTrueOrderByNameAsc(stock.getBloodGroup())) {
+        for (Donor donor : donors.findByFacilityIdAndBloodGroupAndEligibleTrueOrderByNameAsc(
+                stock.getFacility().getId(), stock.getBloodGroup())) {
             if (alerts.existsByStock_IdAndDonor_IdAndResponseStatus(stock.getId(), donor.getId(), PENDING)) {
                 skipped++;
                 continue;
@@ -237,7 +251,7 @@ public class BloodBankService {
                 stock.getBloodGroup(),
                 stock.getUnitsAvailable(),
                 stock.getLowStockThreshold(),
-                stock.getUnitsAvailable() <= stock.getLowStockThreshold(),
+                issuable <= stock.getLowStockThreshold(),
                 issuable,
                 expiringSoon,
                 stock.getLastUpdated());

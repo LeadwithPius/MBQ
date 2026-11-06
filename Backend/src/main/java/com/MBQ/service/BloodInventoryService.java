@@ -99,7 +99,7 @@ public class BloodInventoryService {
         batch.setExpiryDate(request.expiryDate());
         batch.setOpeningQuantity(request.units());
         batch.setRemainingQuantity(request.units());
-        batch.setVerificationStatus(BloodBatchVerificationStatus.VERIFIED);
+        batch.setVerificationStatus(BloodBatchVerificationStatus.PENDING_VERIFICATION);
         batch.setSourceReference(normalize(request.sourceReference()));
         batch.setRecordedBy(actor);
         batches.saveAndFlush(batch);
@@ -212,6 +212,19 @@ public class BloodInventoryService {
                 before, after, List.copyOf(allocations), false);
         completeOperation(claim.operationId(), response);
         return response;
+    }
+
+    @Transactional
+    public void verifyBatch(Long batchId) {
+        BloodStockBatch batch = batches.findById(batchId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+        staffAccess.requireFacilityAccess(batch.getStock().getFacility().getId());
+        if (batch.getVerificationStatus() != BloodBatchVerificationStatus.PENDING_VERIFICATION) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only batches awaiting verification can be verified.");
+        }
+        batch.setVerificationStatus(BloodBatchVerificationStatus.VERIFIED);
+        batches.save(batch);
     }
 
     private BloodStock lockStock(Long stockId) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, BellRing, CheckCircle2, Droplet, PackagePlus, RefreshCw, Send, UserPlus } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, PackagePlus, RefreshCw, Send, UserPlus } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
 
@@ -37,6 +37,7 @@ export function BloodBankPage() {
   const canLedger = LEDGER_ROLES.includes(role);
 
   const [stock, setStock] = useState([]);
+  const [forecasts, setForecasts] = useState([]);
   const [requests, setRequests] = useState([]);
   const [donors, setDonors] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -48,13 +49,15 @@ export function BloodBankPage() {
 
   const load = useCallback(async () => {
     try {
-      const [stockData, requestData, donorData, alertData] = await Promise.all([
+      const [stockData, requestData, donorData, alertData, forecastData] = await Promise.all([
         api("/blood-bank/stock"),
         api("/blood-bank/requests"),
         canManage ? api("/blood-bank/donors") : Promise.resolve([]),
         canManage ? api("/blood-bank/alerts") : Promise.resolve([]),
+        api("/blood-intelligence/forecast"),
       ]);
       setStock(Array.isArray(stockData) ? stockData : []);
+      setForecasts(Array.isArray(forecastData) ? forecastData : []);
       setRequests(Array.isArray(requestData) ? requestData : []);
       setDonors(Array.isArray(donorData) ? donorData : []);
       setAlerts(Array.isArray(alertData) ? alertData : []);
@@ -106,6 +109,15 @@ export function BloodBankPage() {
 
     {error && <div className="notice notice-warning">{error}</div>}
     {notice && <div className="notice">{notice}</div>}
+
+    <section className="panel">
+      <div className="panel-heading"><div><h2>Blood intelligence</h2><p>Transparent 28-day issue-history baseline · not a clinical decision</p></div><Activity size={19} /></div>
+      {forecasts.length === 0 ? <div className="empty-panel">No stock records available for forecasting.</div> :
+        <div className="table-wrap"><table className="data-table"><thead><tr><th>Group</th><th>Usable</th><th>Avg daily demand</th><th>7-day demand</th><th>14-day demand</th><th>Stock-out estimate</th><th>Risk</th><th>Replenish</th></tr></thead><tbody>
+          {forecasts.map(f => <tr key={f.stockId}><td><b>{groupLabel(f.bloodGroup)}</b></td><td>{f.usableUnits}</td><td>{f.forecastAvailable ? f.averageDailyDemand : "Insufficient data"}</td><td>{f.forecastAvailable ? f.predictedDemand7Days : "—"}</td><td>{f.forecastAvailable ? f.predictedDemand14Days : "—"}</td><td>{f.estimatedDaysUntilStockout == null ? "—" : f.estimatedDaysUntilStockout + " days"}</td><td><span className={"pill " + (f.riskLevel === "CRITICAL" || f.riskLevel === "HIGH" ? "priority-emergency" : f.riskLevel === "MODERATE" ? "priority-urgent" : "priority-normal")}>{f.riskLevel.replaceAll("_", " ")}</span></td><td>{f.forecastAvailable ? f.suggestedReplenishmentUnits : "—"}</td></tr>)}
+        </tbody></table></div>}
+      <p className="report-note">Forecasts use recorded issue movements over the last 28 days. At least three distinct issue days are required. No prediction is produced when history is insufficient.</p>
+    </section>
 
     {lowStock.map(item => <div className="blood-low-alert" key={item.stockId} role="alert">
       <AlertTriangle size={18} />
@@ -218,7 +230,7 @@ function StockDetail({ item, canManage, canIssue, canLedger, busy, run }) {
     <h3 className="blood-subheading">Batches</h3>
     {batches.length === 0 ? <div className="empty-panel">No batches recorded.</div> :
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Batch</th><th>Expiry</th><th>Remaining</th><th>Status</th></tr></thead><tbody>
-        {batches.map(b => <tr key={b.id}><td><b>{b.batchReference}</b>{b.sourceReference && <small className="queue-patient-id">{b.sourceReference}</small>}</td><td>{formatDate(b.expiryDate)}</td><td>{b.remainingQuantity} / {b.openingQuantity}</td><td>{b.expired ? <span className="pill priority-emergency">EXPIRED</span> : b.verificationStatus !== "VERIFIED" ? <span className="pill priority-urgent">UNVERIFIED</span> : b.expiringSoon ? <span className="pill priority-urgent">EXPIRING SOON</span> : <span className="pill priority-normal">OK</span>}</td></tr>)}
+        {batches.map(b => <tr key={b.id}><td><b>{b.batchReference}</b>{b.sourceReference && <small className="queue-patient-id">{b.sourceReference}</small>}</td><td>{formatDate(b.expiryDate)}</td><td>{b.remainingQuantity} / {b.openingQuantity}</td><td>{b.expired ? <span className="pill priority-emergency">EXPIRED</span> : b.verificationStatus !== "VERIFIED" ? <><span className="pill priority-urgent">{b.verificationStatus.replaceAll("_", " ")}</span>{canManage && b.verificationStatus === "PENDING_VERIFICATION" && <button className="table-action" disabled={busy} onClick={() => run(() => api("/blood-bank/inventory/batches/" + b.id + "/verify", { method: "PATCH" }), "Batch " + b.batchReference + " verified.")}>Verify batch</button>}</> : b.expiringSoon ? <span className="pill priority-urgent">EXPIRING SOON</span> : <span className="pill priority-normal">OK</span>}</td></tr>)}
       </tbody></table></div>}
 
     {canLedger && <>

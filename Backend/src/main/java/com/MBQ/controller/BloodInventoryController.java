@@ -37,4 +37,12 @@ public class BloodInventoryController {
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         return inventoryService.issue(request, idempotencyKey);
     }
+    /** Verify a newly received batch after the required physical and documentation checks. */
+    @PatchMapping("/batches/{batchId}/verify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LAB_STAFF')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyBatch(@PathVariable Long batchId) {
+        inventoryService.verifyBatch(batchId);
+    }
+
 }
