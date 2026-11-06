@@ -10,12 +10,14 @@ Modules
 
 Module	What it does
 Reception	Registers patients and generates timestamped queue tickets assigned to a department.
-Queue dashboard	Shows live ticket order, status and position; supports "call next" and priority flagging.
+Queue dashboard	Shows live ticket order, status and position; nurses can call the next patient and triage staff can flag priority.
+Clinical triage	Nurses record observations and vitals; doctors review risk recommendations and read the nurse's notes.
+Doctor consultations	Doctors document presenting complaints, history, examination, diagnosis, treatment, prescriptions, investigations and follow-up; finalized notes are read-only.
 Blood bank	CRUD for blood stock per blood group, configurable low-stock threshold, simulated donor alert log.
 Reporting	Daily patient volume and blood stock movement summaries.
 Auth	Stateless JWT login with role-based access control.
 
-Roles: RECEPTIONIST, TRIAGE_NURSE, DOCTOR, LAB_STAFF, ADMIN
+Roles: RECEPTIONIST, NURSE, DOCTOR, LAB_STAFF, ADMIN
 
 Tech Stack
 Layer	Technology
@@ -80,20 +82,30 @@ Every endpoint is restricted by role, so a user can only call actions relevant t
 Accounts are created by an admin. There is no self-registration and no third-party OAuth.
 REST API (indicative)
 
-Endpoint names below are a planned outline and may change during development.
+The main implemented workflow endpoints are listed below.
 
 Area	Method & path	Roles
 Auth	POST /api/auth/login	Public
-Users	GET/POST/PUT/DELETE /api/users	Admin
-Patients	POST /api/patients, GET /api/patients/{id}	Receptionist
-Queue	GET /api/queue	All staff
-Queue	POST /api/queue/next	Triage Nurse
-Queue	PUT /api/queue/{ticketId}/priority	Triage Nurse
-Consultation	PUT /api/queue/{ticketId}/outcome	Doctor
+Patients	GET/POST /api/patients	Admin, Doctor, Nurse, Receptionist (POST: Admin, Receptionist)
+Queue	GET /api/queue/departments/{departmentId}/waiting	Admin, Doctor, Nurse, Receptionist
+Queue	GET /api/queue/departments/{departmentId}/in-progress	Admin, Doctor, Nurse, Receptionist
+Queue	POST /api/queue/departments/{departmentId}/call-next	Admin, Doctor, Nurse
+Queue	PATCH /api/queue/tickets/{ticketId}/priority	Admin, Doctor, Nurse
+Triage	POST /api/triage/observations	Admin, Nurse
+Triage	GET /api/triage/patients/{patientId}/observations	Admin, Doctor, Nurse
+Consultation	POST /api/consultations	Admin, Doctor (save/update draft)
+Consultation	GET /api/consultations/tickets/{ticketId}	Admin, Doctor
+Consultation	GET /api/consultations/patients/{patientId}	Admin, Doctor
+Consultation	PATCH /api/consultations/{consultationId}/complete	Admin, Doctor
 Blood stock	GET /api/blood-stock	Lab Staff, Doctor
-Blood stock	POST/PUT/DELETE /api/blood-stock/{id}	Lab Staff
-Alerts	GET /api/alerts, POST /api/alerts/donor	Lab Staff
 Reports	GET /api/reports/daily	Admin
+
+Consultation workflow:
+1. A nurse calls the next waiting patient from Queue management. The API atomically selects the highest-priority/oldest waiting ticket and moves it to IN_PROGRESS.
+2. The doctor opens Consultations, selects a patient in the Now serving list and reviews triage observations recorded for that queue visit.
+3. The doctor saves a draft consultation. One consultation is associated with each queue ticket, while a patient can have multiple consultations across visits.
+4. The doctor completes the consultation. The record becomes read-only and the associated queue ticket is marked COMPLETED in the same transaction.
+5. Completed consultations remain available as patient history.
 
 
 Prerequisites
