@@ -25,7 +25,9 @@ public final class BloodInventoryDtos {
     public record IssueRequest(
             @NotNull Long stockId,
             @Min(1) int units,
-            @NotBlank @Size(max = 500) String reason
+            @NotBlank @Size(max = 500) String reason,
+            /** Optional: when set, the stock's blood group must be compatible with this patient. */
+            Long patientId
     ) {}
 
     public record BatchAllocation(
