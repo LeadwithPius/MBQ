@@ -109,6 +109,8 @@ Blood bank	GET /api/blood-bank/stock, /requests, /donors, /alerts	see BloodBankC
 Blood bank	POST /api/blood-bank/inventory/batches (Idempotency-Key)	Admin, Lab Staff
 Blood bank	POST /api/blood-bank/inventory/issues (Idempotency-Key, optional patientId)	Admin, Lab Staff, Doctor
 Blood bank	PATCH /api/blood-bank/inventory/batches/{id}/verify	Admin, Lab Staff
+Blood bank	POST /api/blood-bank/inventory/write-offs (Idempotency-Key)	Admin, Lab Staff
+Staff	GET/POST /api/admin/staff, PATCH /api/admin/staff/{id}/active, /password	Admin
 Donations	GET/POST /api/blood-bank/donations	Admin, Lab Staff, Nurse
 Donations	PATCH /api/blood-bank/donations/{id}/screen	Admin, Lab Staff
 Forecast	GET /api/blood-intelligence/forecast	see BloodIntelligenceController

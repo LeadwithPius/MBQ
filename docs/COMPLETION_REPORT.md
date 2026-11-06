@@ -46,7 +46,7 @@ They are written but have **not been executed yet**.
 | Module | Status | Notes |
 | --- | --- | --- |
 | Auth / JWT / RBAC | COMPLETE | Login, BCrypt, stateless JWT, `@PreAuthorize` on every controller. Self password change added. |
-| Staff account management | **MISSING** | Accounts come only from the seeder. No admin screen to create, deactivate or reset staff. |
+| Staff account management | COMPLETE | Admin "Staff accounts" page: create (non-admins need a department, username unique), deactivate/reactivate (not yourself; deactivated users are locked out immediately), reset password. Accounts are never deleted. |
 | Patients | COMPLETE | Register/search, facility-scoped. |
 | Queue / triage | COMPLETE | Priority ordering, call-next with a row lock, duplicate-ticket check, triage observations. |
 | Queue concurrency (Workflow F) | NEEDS VERIFICATION | Pessimistic lock is in place. No concurrent load test exists. |
@@ -54,11 +54,12 @@ They are written but have **not been executed yet**.
 | Laboratory | COMPLETE (new) | Request only from an open consultation, by its doctor. Duplicate open test → 409 (also a DB unique index). Lab worklist is urgent-first and facility-scoped. Start → result → **immutable**. Cancel needs a reason. Doctor sees results (polls every 10 s) and previous results. |
 | Blood bank: receive / verify / issue | COMPLETE | Idempotency-Key, FEFO, never negative, only verified + unexpired units issuable. |
 | Blood bank: compatibility | COMPLETE (new) | Optional `patientId` on issue. Incompatible group → 409 before any stock change. Unknown patient group → O− only. |
-| Blood bank: expire / waste / transfer / adjust | **MISSING** | Movement types exist in the enum, but there is no API or UI. Expired units are already excluded from issuing, but they are not written off from the total. |
+| Blood bank: expire / waste | COMPLETE | "Write off" on expired batches removes all remaining units; "Record wastage" removes N units from any batch. Idempotent, locked, never negative, recorded as EXPIRED/WASTED movements. |
+| Blood bank: transfer / manual adjustment | NOT BUILT | Out of scope for the demo (single facility). Enum values exist for later. |
 | Thresholds + low-stock alert (Workflow E) | COMPLETE | Per-group threshold, low flag on issuable units, simulated donor alerts. |
 | Donors | COMPLETE | Facility-scoped (V10). Seeder fixed. |
 | Donations (Workflow C) | COMPLETE (new) | Eligible donor only, 56-day interval, 1–2 units. Screen PASS → batch `DON-<id>`, expiry = collection + 35 days, `PENDING_VERIFICATION`. FAIL → no stock change. Each donation can be screened once. |
-| Reports | PARTIAL | Daily queue/blood report works. Lab and donation figures are not in the report yet. |
+| Reports | COMPLETE | Daily report now also shows units written off, donations collected/passed/failed, and lab tests requested/completed. |
 | AI readiness | COMPLETE for blood forecast; NEEDS VERIFICATION for clinical risk | Forecast is a transparent 28-day baseline and returns INSUFFICIENT_DATA instead of guessing. The clinical risk assessment provider was not reviewed in this pass. |
 | Frontend UX | COMPLETE for the flows above | Role-based menu. Lab staff land on Laboratory. |
 | Database quality | COMPLETE | FKs, CHECK constraints (result only when completed; donation status ↔ batch), indexes. `ddl-auto=validate` mappings checked by hand against V11/V12. |
