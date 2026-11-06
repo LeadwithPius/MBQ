@@ -73,14 +73,15 @@ export function ConsultationPage() {
     const rows = await api("/queue/departments/" + departmentId + "/in-progress");
     const activeRows = Array.isArray(rows) ? rows : [];
     setTickets(activeRows);
-    if (selectedId && !activeRows.some(row => String(row.id) === String(selectedId))) {
+    if (selectedId && consultation?.status !== "COMPLETED"
+        && !activeRows.some(row => String(row.id) === String(selectedId))) {
       setSelectedId("");
       setSelectedTicket(null);
       setConsultation(null);
       setObservations([]);
       setForm(EMPTY_FORM);
     }
-  }, [departmentId, selectedId]);
+  }, [departmentId, selectedId, consultation?.status]);
 
   useEffect(() => {
     let active = true;
