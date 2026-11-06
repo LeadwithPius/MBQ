@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.MBQ.dto.ConsultationDtos.ConsultationResponse;
 import com.MBQ.dto.ConsultationDtos.SaveConsultationRequest;
+import com.MBQ.dto.QueueDtos.UpdateTicketStatusRequest;
 import com.MBQ.model.Consultation;
 import com.MBQ.model.ConsultationStatus;
 import com.MBQ.model.QueueTicket;
@@ -26,16 +27,19 @@ public class ConsultationService {
     private final QueueTicketRepository tickets;
     private final PatientRepository patients;
     private final StaffAccessService staffAccess;
+    private final QueueService queueService;
 
     public ConsultationService(
             ConsultationRepository consultations,
             QueueTicketRepository tickets,
             PatientRepository patients,
-            StaffAccessService staffAccess) {
+            StaffAccessService staffAccess,
+            QueueService queueService) {
         this.consultations = consultations;
         this.tickets = tickets;
         this.patients = patients;
         this.staffAccess = staffAccess;
+        this.queueService = queueService;
     }
 
     @Transactional
@@ -121,7 +125,13 @@ public class ConsultationService {
         consultation.setStatus(ConsultationStatus.COMPLETED);
         consultation.setUpdatedAt(OffsetDateTime.now());
         consultation.setCompletedAt(OffsetDateTime.now());
-        return toResponse(consultations.saveAndFlush(consultation));
+        Consultation saved = consultations.saveAndFlush(consultation);
+        // Complete the queue ticket in the same transaction so the patient leaves
+        // the "now serving" list only after the doctor finalizes the consultation.
+        queueService.updateTicketStatus(
+                consultation.getQueueTicket().getId(),
+                new UpdateTicketStatusRequest(TicketStatus.COMPLETED, "Consultation completed", null));
+        return toResponse(saved);
     }
 
     private void requireDraftOwner(Consultation consultation, StaffUser currentStaff) {
