@@ -13,7 +13,9 @@ Reception	Registers patients and generates timestamped queue tickets assigned to
 Queue dashboard	Shows live ticket order, status and position; nurses can call the next patient and triage staff can flag priority.
 Clinical triage	Nurses record observations and vitals; doctors review risk recommendations and read the nurse's notes.
 Doctor consultations	Doctors document presenting complaints, history, examination, diagnosis, treatment, prescriptions, investigations and follow-up; finalized notes are read-only.
-Blood bank	CRUD for blood stock per blood group, configurable low-stock threshold, simulated donor alert log.
+Laboratory	Doctors request tests from an open consultation; lab staff start, result (immutable) or cancel them; doctors see results in the consultation.
+Blood bank	Batch-level stock (receive, verify, FEFO issue, idempotent), ABO/RhD compatibility check when issuing for a patient, low-stock threshold, transparent demand forecast, simulated donor alerts.
+Donations	Record a donation from an eligible donor (56-day interval); only donations that pass screening enter stock, as a batch awaiting verification.
 Reporting	Daily patient volume and blood stock movement summaries.
 Auth	Stateless JWT login with role-based access control.
 
@@ -97,7 +99,19 @@ Consultation	POST /api/consultations	Admin, Doctor (save/update draft)
 Consultation	GET /api/consultations/tickets/{ticketId}	Admin, Doctor
 Consultation	GET /api/consultations/patients/{patientId}	Admin, Doctor
 Consultation	PATCH /api/consultations/{consultationId}/complete	Admin, Doctor
-Blood stock	GET /api/blood-stock	Lab Staff, Doctor
+Auth	POST /api/auth/change-password	Any signed-in staff
+Laboratory	POST /api/lab/requests	Admin, Doctor
+Laboratory	GET /api/lab/requests[?status=]	Admin, Lab Staff (worklist)
+Laboratory	GET /api/lab/requests/consultations/{id}, /patients/{id}	Admin, Doctor, Lab Staff
+Laboratory	PATCH /api/lab/requests/{id}/start, /complete	Admin, Lab Staff
+Laboratory	PATCH /api/lab/requests/{id}/cancel	Admin, Doctor, Lab Staff
+Blood bank	GET /api/blood-bank/stock, /requests, /donors, /alerts	see BloodBankController
+Blood bank	POST /api/blood-bank/inventory/batches (Idempotency-Key)	Admin, Lab Staff
+Blood bank	POST /api/blood-bank/inventory/issues (Idempotency-Key, optional patientId)	Admin, Lab Staff, Doctor
+Blood bank	PATCH /api/blood-bank/inventory/batches/{id}/verify	Admin, Lab Staff
+Donations	GET/POST /api/blood-bank/donations	Admin, Lab Staff, Nurse
+Donations	PATCH /api/blood-bank/donations/{id}/screen	Admin, Lab Staff
+Forecast	GET /api/blood-intelligence/forecast	see BloodIntelligenceController
 Reports	GET /api/reports/daily	Admin
 
 Consultation workflow:
@@ -109,7 +123,7 @@ Consultation workflow:
 
 
 Prerequisites
-Java JDK 17+
+Java JDK 21
 Maven 3.8+
 Node.js 18+ and npm
 PostgreSQL 14+
@@ -153,6 +167,8 @@ Optional: `DB_URL` (default `jdbc:postgresql://localhost:5432/mbq`), `DB_USERNAM
 cd Backend
 ./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
 ```
+
+The API listens on port 8081 (the frontend dev server proxies `/api` there). Set `SERVER_PORT` to change it, and `MBQ_API_TARGET` for the frontend proxy to match.
 
 ### 4. Start the frontend
 
