@@ -94,12 +94,12 @@ public class DataSeeder {
                 }
             }
 
-            seedDonor(donors, "Mwila Chanda", BloodGroup.O_NEG, "0971000001", true);
-            seedDonor(donors, "Bupe Mulenga", BloodGroup.O_NEG, "0971000002", true);
-            seedDonor(donors, "Kasonde Phiri", BloodGroup.AB_NEG, "0971000003", true);
-            seedDonor(donors, "Natasha Banda", BloodGroup.O_POS, "0971000004", true);
-            seedDonor(donors, "Joseph Tembo", BloodGroup.A_POS, "0971000005", true);
-            seedDonor(donors, "Chilufya Zulu", BloodGroup.O_NEG, "0971000006", false);
+            seedDonor(donors, facility, "Mwila Chanda", BloodGroup.O_NEG, "0971000001", true);
+            seedDonor(donors, facility, "Bupe Mulenga", BloodGroup.O_NEG, "0971000002", true);
+            seedDonor(donors, facility, "Kasonde Phiri", BloodGroup.AB_NEG, "0971000003", true);
+            seedDonor(donors, facility, "Natasha Banda", BloodGroup.O_POS, "0971000004", true);
+            seedDonor(donors, facility, "Joseph Tembo", BloodGroup.A_POS, "0971000005", true);
+            seedDonor(donors, facility, "Chilufya Zulu", BloodGroup.O_NEG, "0971000006", false);
         };
     }
 
@@ -133,13 +133,14 @@ public class DataSeeder {
         movements.save(movement);
     }
 
-    private void seedDonor(DonorRepository donors, String name, BloodGroup group,
+    private void seedDonor(DonorRepository donors, Facility facility, String name, BloodGroup group,
                            String contact, boolean eligible) {
         Donor donor = new Donor();
         donor.setName(name);
         donor.setBloodGroup(group);
         donor.setContact(contact);
         donor.setEligible(eligible);
+        donor.setFacility(facility);
         donors.save(donor);
     }
 
