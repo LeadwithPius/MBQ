@@ -14,4 +14,7 @@ public class Donor {
     private BloodGroup bloodGroup;
     private String contact;
     private boolean eligible = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "facility_id")
+    private Facility facility;
 }
