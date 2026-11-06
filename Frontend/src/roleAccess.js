@@ -7,4 +7,5 @@ export const ROLE_ACCESS = Object.freeze({
   LABORATORY: ["ADMIN", "LAB_STAFF"],
   BLOOD_BANK: ["ADMIN", "DOCTOR", "NURSE", "LAB_STAFF"],
   REPORTS: ["ADMIN"],
+  STAFF: ["ADMIN"],
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X, FileText, FlaskConical, KeyRound } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X, FileText, FlaskConical, KeyRound, UserCog } from "lucide-react";
 import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
@@ -15,6 +15,7 @@ const links = [
   { to: "/app/laboratory", label: "Laboratory", icon: FlaskConical, roles: ROLE_ACCESS.LABORATORY },
   { to: "/app/blood-bank", label: "Blood bank", icon: Droplet, roles: ROLE_ACCESS.BLOOD_BANK },
   { to: "/app/reports", label: "Reports", icon: Activity, roles: ROLE_ACCESS.REPORTS },
+  { to: "/app/staff", label: "Staff accounts", icon: UserCog, roles: ROLE_ACCESS.STAFF },
 ];
 
 export function WorkspaceLayout() {

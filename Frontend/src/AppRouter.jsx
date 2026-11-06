@@ -10,6 +10,7 @@ import { ReportsPage } from "./pages/Reports";
 import { ConsultationPage } from "./pages/Consultation";
 import { LaboratoryPage } from "./pages/Laboratory";
 import { AccountPage } from "./pages/Account";
+import { StaffPage } from "./pages/Staff";
 import {
   WorkspaceLayout, DashboardPage, PatientsPage, QueuePage, TriagePage,
 } from "./pages/Workspace";
@@ -49,6 +50,7 @@ function AppRoutes() {
           <Route path="consultations" element={<RequireRoles roles={ROLE_ACCESS.CONSULTATIONS}><ConsultationPage /></RequireRoles>} />
           <Route path="laboratory" element={<RequireRoles roles={ROLE_ACCESS.LABORATORY}><LaboratoryPage /></RequireRoles>} />
           <Route path="account" element={<AccountPage />} />
+          <Route path="staff" element={<RequireRoles roles={ROLE_ACCESS.STAFF}><StaffPage /></RequireRoles>} />
           <Route path="blood-bank" element={<RequireRoles roles={ROLE_ACCESS.BLOOD_BANK}><BloodBankPage /></RequireRoles>} />
           <Route path="reports" element={<RequireRoles roles={ROLE_ACCESS.REPORTS}><ReportsPage /></RequireRoles>} />
           <Route path="*" element={<Navigate to="/app" replace />} />

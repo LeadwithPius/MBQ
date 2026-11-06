@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, HeartHandshake, PackagePlus, RefreshCw, Send, UserPlus, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, HeartHandshake, Trash2, PackagePlus, RefreshCw, Send, UserPlus, XCircle } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
 
@@ -9,6 +9,7 @@ const ISSUE_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];   // issue units
 const LEDGER_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];  // movement history
 
 const GROUPS = ["A_POS", "A_NEG", "B_POS", "B_NEG", "AB_POS", "AB_NEG", "O_POS", "O_NEG"];
+const OUTFLOW = ["ISSUED", "EXPIRED", "WASTED", "TRANSFER_OUT", "ADJUSTMENT_OUT"];
 const groupLabel = group => (group || "").replace("_POS", "+").replace("_NEG", "−");
 
 function idempotencyKey() {
@@ -202,6 +203,25 @@ function StockDetail({ item, patients = [], canManage, canIssue, canLedger, busy
     if (ok) setIssue({ units: "", reason: "", patientId: "" });
   }
 
+  const [waste, setWaste] = useState({ batchId: "", units: "", reason: "" });
+  const wasteBatch = batches.find(b => String(b.id) === waste.batchId);
+
+  const writeOffExpired = b => run(() => api("/blood-bank/inventory/write-offs", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey() },
+    body: { batchId: b.id, type: "EXPIRED", units: null, reason: "Expired on " + b.expiryDate },
+  }), result => "Wrote off " + result.unitsChanged + " expired unit(s) from " + b.batchReference + ". Stock is now " + result.quantityAfter + ".");
+
+  async function submitWaste(event) {
+    event.preventDefault();
+    const ok = await run(() => api("/blood-bank/inventory/write-offs", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey() },
+      body: { batchId: Number(waste.batchId), type: "WASTED", units: Number(waste.units), reason: waste.reason.trim() },
+    }), result => "Recorded " + result.unitsChanged + " wasted unit(s). Stock is now " + result.quantityAfter + ".");
+    if (ok) setWaste({ batchId: "", units: "", reason: "" });
+  }
+
   const saveThreshold = event => {
     event.preventDefault();
     run(() => api("/blood-bank/stock/" + item.stockId + "/threshold", { method: "PATCH", body: { lowStockThreshold: Number(threshold) } }),
@@ -239,14 +259,25 @@ function StockDetail({ item, patients = [], canManage, canIssue, canLedger, busy
     <h3 className="blood-subheading">Batches</h3>
     {batches.length === 0 ? <div className="empty-panel">No batches recorded.</div> :
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Batch</th><th>Expiry</th><th>Remaining</th><th>Status</th></tr></thead><tbody>
-        {batches.map(b => <tr key={b.id}><td><b>{b.batchReference}</b>{b.sourceReference && <small className="queue-patient-id">{b.sourceReference}</small>}</td><td>{formatDate(b.expiryDate)}</td><td>{b.remainingQuantity} / {b.openingQuantity}</td><td>{b.expired ? <span className="pill priority-emergency">EXPIRED</span> : b.verificationStatus !== "VERIFIED" ? <><span className="pill priority-urgent">{b.verificationStatus.replaceAll("_", " ")}</span>{canManage && b.verificationStatus === "PENDING_VERIFICATION" && <button className="table-action" disabled={busy} onClick={() => run(() => api("/blood-bank/inventory/batches/" + b.id + "/verify", { method: "PATCH" }), "Batch " + b.batchReference + " verified.")}>Verify batch</button>}</> : b.expiringSoon ? <span className="pill priority-urgent">EXPIRING SOON</span> : <span className="pill priority-normal">OK</span>}</td></tr>)}
+        {batches.map(b => <tr key={b.id}><td><b>{b.batchReference}</b>{b.sourceReference && <small className="queue-patient-id">{b.sourceReference}</small>}</td><td>{formatDate(b.expiryDate)}</td><td>{b.remainingQuantity} / {b.openingQuantity}</td><td>{b.expired ? <><span className="pill priority-emergency">EXPIRED</span>{canManage && b.remainingQuantity > 0 && <button className="table-action table-action-blood" disabled={busy} onClick={() => writeOffExpired(b)}><Trash2 size={12} /> Write off</button>}</> : b.verificationStatus !== "VERIFIED" ? <><span className="pill priority-urgent">{b.verificationStatus.replaceAll("_", " ")}</span>{canManage && b.verificationStatus === "PENDING_VERIFICATION" && <button className="table-action" disabled={busy} onClick={() => run(() => api("/blood-bank/inventory/batches/" + b.id + "/verify", { method: "PATCH" }), "Batch " + b.batchReference + " verified.")}>Verify batch</button>}</> : b.expiringSoon ? <span className="pill priority-urgent">EXPIRING SOON</span> : <span className="pill priority-normal">OK</span>}</td></tr>)}
       </tbody></table></div>}
+
+    {canManage && batches.some(b => b.remainingQuantity > 0) && <form className="form-grid blood-form waste-form" onSubmit={submitWaste}>
+      <h3 className="span-two"><Trash2 size={16} /> Record wastage</h3>
+      <label>Batch<select required value={waste.batchId} onChange={e => setWaste({ ...waste, batchId: e.target.value })}>
+        <option value="">Select a batch</option>
+        {batches.filter(b => b.remainingQuantity > 0).map(b => <option key={b.id} value={b.id}>{b.batchReference} · {b.remainingQuantity} left</option>)}
+      </select></label>
+      <label>Units<input type="number" min="1" max={wasteBatch?.remainingQuantity || undefined} required value={waste.units} onChange={e => setWaste({ ...waste, units: e.target.value })} /></label>
+      <label className="span-two">Reason<input required maxLength={500} value={waste.reason} onChange={e => setWaste({ ...waste, reason: e.target.value })} placeholder="e.g. Bag punctured, cold chain broken" /></label>
+      <button className="button button-outline span-two" disabled={busy}>Record wasted units</button>
+    </form>}
 
     {canLedger && <>
       <h3 className="blood-subheading">Recent movements</h3>
       {movements.length === 0 ? <div className="empty-panel">No movements yet.</div> :
         <div className="table-wrap"><table className="data-table"><thead><tr><th>When</th><th>Type</th><th>Units</th><th>Balance</th><th>Batch</th><th>Reason</th><th>By</th></tr></thead><tbody>
-          {movements.map(m => <tr key={m.id}><td>{formatDateTime(m.createdAt)}</td><td>{m.movementType}</td><td>{m.movementType === "ISSUED" ? "−" : "+"}{m.unitsChanged}</td><td>{m.quantityBefore} → {m.quantityAfter}</td><td>{m.batchReference || "—"}</td><td>{m.reason || "—"}</td><td>{m.recordedBy || "System"}</td></tr>)}
+          {movements.map(m => <tr key={m.id}><td>{formatDateTime(m.createdAt)}</td><td>{m.movementType}</td><td>{OUTFLOW.includes(m.movementType) ? "−" : "+"}{m.unitsChanged}</td><td>{m.quantityBefore} → {m.quantityAfter}</td><td>{m.batchReference || "—"}</td><td>{m.reason || "—"}</td><td>{m.recordedBy || "System"}</td></tr>)}
         </tbody></table></div>}
     </>}
   </section>;
