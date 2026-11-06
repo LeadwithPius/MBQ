@@ -22,6 +22,8 @@ import com.MBQ.dto.BloodInventoryDtos.BatchAllocation;
 import com.MBQ.dto.BloodInventoryDtos.InventoryOperationResponse;
 import com.MBQ.dto.BloodInventoryDtos.IssueRequest;
 import com.MBQ.dto.BloodInventoryDtos.ReceiveBatchRequest;
+import com.MBQ.dto.BloodInventoryDtos.WriteOffRequest;
+import com.MBQ.dto.BloodInventoryDtos.WriteOffType;
 import com.MBQ.model.BloodBatchVerificationStatus;
 import com.MBQ.model.BloodInventoryOperation;
 import com.MBQ.model.BloodInventoryOperationType;
@@ -34,6 +36,8 @@ import com.MBQ.repository.BloodInventoryOperationRepository;
 import com.MBQ.repository.BloodStockBatchRepository;
 import com.MBQ.repository.BloodStockMovementRepository;
 import com.MBQ.repository.BloodStockRepository;
+import com.MBQ.repository.PatientRepository;
+import com.MBQ.model.Patient;
 
 @Service
 public class BloodInventoryService {
@@ -45,6 +49,7 @@ public class BloodInventoryService {
     private final StaffAccessService staffAccess;
     private final JdbcTemplate jdbc;
     private final JsonMapper objectMapper;
+    private final PatientRepository patients;
 
     public BloodInventoryService(
             BloodStockRepository stocks,
@@ -53,7 +58,8 @@ public class BloodInventoryService {
             BloodInventoryOperationRepository operations,
             StaffAccessService staffAccess,
             JdbcTemplate jdbc,
-            JsonMapper objectMapper) {
+            JsonMapper objectMapper,
+            PatientRepository patients) {
         this.stocks = stocks;
         this.batches = batches;
         this.movements = movements;
@@ -61,6 +67,7 @@ public class BloodInventoryService {
         this.staffAccess = staffAccess;
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.patients = patients;
     }
 
     @Transactional
@@ -99,7 +106,7 @@ public class BloodInventoryService {
         batch.setExpiryDate(request.expiryDate());
         batch.setOpeningQuantity(request.units());
         batch.setRemainingQuantity(request.units());
-        batch.setVerificationStatus(BloodBatchVerificationStatus.VERIFIED);
+        batch.setVerificationStatus(BloodBatchVerificationStatus.PENDING_VERIFICATION);
         batch.setSourceReference(normalize(request.sourceReference()));
         batch.setRecordedBy(actor);
         batches.saveAndFlush(batch);
@@ -145,9 +152,14 @@ public class BloodInventoryService {
         BloodStock stock = lockStock(request.stockId());
         staffAccess.requireFacilityAccess(stock.getFacility().getId());
 
+        if (request.patientId() != null) {
+            requireCompatiblePatient(request.patientId(), stock);
+        }
+
         String fingerprint = fingerprint(
                 "ISSUE|" + request.stockId() + "|" + request.units() + "|"
-                + request.reason().trim());
+                + request.reason().trim()
+                + (request.patientId() == null ? "" : "|patient=" + request.patientId()));
 
         OperationClaim claim = claimOperation(
                 idempotencyKey, fingerprint, BloodInventoryOperationType.ISSUE, actor);
@@ -212,6 +224,132 @@ public class BloodInventoryService {
                 before, after, List.copyOf(allocations), false);
         completeOperation(claim.operationId(), response);
         return response;
+    }
+
+    /**
+     * Write off expired or wasted units so the stock total matches what is physically usable.
+     * Same idempotency and locking rules as receive/issue; stock can never go negative.
+     */
+    @Transactional
+    public InventoryOperationResponse writeOff(WriteOffRequest request, String idempotencyKey) {
+        validateIdempotencyKey(idempotencyKey);
+        if (request == null || request.batchId() == null || request.type() == null || blank(request.reason())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A batch, write-off type and reason are required.");
+        }
+
+        StaffUser actor = staffAccess.currentStaff();
+        BloodStockBatch unlocked = batches.findById(request.batchId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+        // Lock order matches issue(): stock first, then batch.
+        BloodStock stock = lockStock(unlocked.getStock().getId());
+        staffAccess.requireFacilityAccess(stock.getFacility().getId());
+        BloodStockBatch batch = batches.findByIdForUpdate(request.batchId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+
+        boolean expiredType = request.type() == WriteOffType.EXPIRED;
+        String fingerprint = fingerprint(
+                "WRITE_OFF|" + request.type() + "|" + request.batchId() + "|"
+                + (expiredType ? "ALL" : String.valueOf(request.units())) + "|" + request.reason().trim());
+        BloodInventoryOperationType opType = expiredType
+                ? BloodInventoryOperationType.EXPIRE : BloodInventoryOperationType.WASTE;
+
+        OperationClaim claim = claimOperation(idempotencyKey, fingerprint, opType, actor);
+        if (!claim.created()) {
+            return replay(claim, fingerprint, opType);
+        }
+
+        int remaining = batch.getRemainingQuantity();
+        if (remaining < 1) {
+            throw conflict("This batch has no units left to write off.");
+        }
+        int units;
+        if (expiredType) {
+            if (batch.getExpiryDate() == null || !batch.getExpiryDate().isBefore(LocalDate.now())) {
+                throw conflict("Only a batch past its expiry date can be written off as expired.");
+            }
+            units = remaining;
+        } else {
+            if (request.units() == null || request.units() < 1 || request.units() > remaining) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Wasted units must be between 1 and " + remaining + " for this batch.");
+            }
+            units = request.units();
+        }
+
+        int before = stock.getUnitsAvailable();
+        if (before < units) {
+            throw new IllegalStateException("Batch balances exceed aggregate stock. Reconciliation is required.");
+        }
+        int after = before - units;
+
+        batch.setRemainingQuantity(remaining - units);
+        batches.save(batch);
+        stock.setUnitsAvailable(after);
+        stocks.save(stock);
+
+        BloodInventoryOperation operation = operations.findById(claim.operationId())
+                .orElseThrow(() -> new IllegalStateException("Inventory operation disappeared"));
+        BloodStockMovement movement = new BloodStockMovement();
+        movement.setStock(stock);
+        movement.setBatch(batch);
+        movement.setMovementType(expiredType ? BloodStockMovementType.EXPIRED : BloodStockMovementType.WASTED);
+        movement.setUnitsChanged(units);
+        movement.setQuantityBefore(before);
+        movement.setQuantityAfter(after);
+        movement.setReason(request.reason().trim());
+        movement.setRecordedBy(actor);
+        movement.setCreatedAt(LocalDateTime.now());
+        movement.setIdempotencyKey(idempotencyKey);
+        movement.setRequestFingerprint(fingerprint);
+        movement.setOperation(operation);
+        movements.save(movement);
+
+        InventoryOperationResponse response = new InventoryOperationResponse(
+                claim.operationId(), expiredType ? "EXPIRE" : "WASTE", stock.getId(), units, before, after,
+                List.of(new BatchAllocation(batch.getId(), batch.getBatchReference(), batch.getExpiryDate(), units)),
+                false);
+        completeOperation(claim.operationId(), response);
+        return response;
+    }
+
+    @Transactional
+    public void verifyBatch(Long batchId) {
+        BloodStockBatch batch = batches.findById(batchId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Batch not found"));
+        staffAccess.requireFacilityAccess(batch.getStock().getFacility().getId());
+        if (batch.getVerificationStatus() != BloodBatchVerificationStatus.PENDING_VERIFICATION) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only batches awaiting verification can be verified.");
+        }
+        batch.setVerificationStatus(BloodBatchVerificationStatus.VERIFIED);
+        batches.save(batch);
+    }
+
+    /**
+     * Workflow D safety check: blood issued for a named patient must be
+     * ABO/RhD compatible. An unknown patient group only allows O negative.
+     */
+    private void requireCompatiblePatient(Long patientId, BloodStock stock) {
+        Patient patient = patients.findById(patientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Patient not found"));
+        staffAccess.requirePatientFacilityAccess(patient);
+        if (!patient.getFacility().getId().equals(stock.getFacility().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "This patient belongs to a different facility from the selected stock");
+        }
+        if (!BloodCompatibility.canReceive(patient.getBloodGroup(), stock.getBloodGroup())) {
+            String patientGroup = patient.getBloodGroup() == null ? "unknown" : label(patient.getBloodGroup());
+            String allowed = BloodCompatibility.compatibleDonorsFor(patient.getBloodGroup()).stream()
+                    .map(BloodInventoryService::label).sorted().reduce((a, b) -> a + ", " + b).orElse("");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Incompatible blood: " + patient.getName() + " (group " + patientGroup + ") cannot receive "
+                    + label(stock.getBloodGroup()) + ". Compatible groups: " + allowed + ".");
+        }
+    }
+
+    private static String label(com.MBQ.model.BloodGroup group) {
+        return group.name().replace("_POS", "+").replace("_NEG", "-");
     }
 
     private BloodStock lockStock(Long stockId) {

@@ -15,6 +15,10 @@ public interface BloodStockMovementRepository
     List<BloodStockMovement> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             java.time.LocalDateTime from, java.time.LocalDateTime to);
 
+    List<BloodStockMovement> findByStock_IdAndMovementTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            Long stockId, com.MBQ.model.BloodStockMovementType movementType,
+            java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     /** The 20 most recent ledger entries for one stock. */
     List<BloodStockMovement> findTop20ByStock_IdOrderByCreatedAtDescIdDesc(Long stockId);
 }

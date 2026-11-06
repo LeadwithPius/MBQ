@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Clock3, Droplet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, ShieldAlert, Stethoscope, Users, X, FileText, FlaskConical, KeyRound, UserCog } from "lucide-react";
 import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
@@ -11,8 +11,11 @@ const links = [
   { to: "/app/patients", label: "Patients", icon: Users, roles: ROLE_ACCESS.PATIENTS },
   { to: "/app/queue", label: "Queue management", icon: ClipboardList, roles: ROLE_ACCESS.QUEUE },
   { to: "/app/triage", label: "Clinical triage", icon: Stethoscope, roles: ROLE_ACCESS.TRIAGE },
+  { to: "/app/consultations", label: "Consultations", icon: FileText, roles: ROLE_ACCESS.CONSULTATIONS },
+  { to: "/app/laboratory", label: "Laboratory", icon: FlaskConical, roles: ROLE_ACCESS.LABORATORY },
   { to: "/app/blood-bank", label: "Blood bank", icon: Droplet, roles: ROLE_ACCESS.BLOOD_BANK },
   { to: "/app/reports", label: "Reports", icon: Activity, roles: ROLE_ACCESS.REPORTS },
+  { to: "/app/staff", label: "Staff accounts", icon: UserCog, roles: ROLE_ACCESS.STAFF },
 ];
 
 export function WorkspaceLayout() {
@@ -52,6 +55,7 @@ export function WorkspaceLayout() {
           <b>{staff?.name || "Staff member"}</b>
           <small>{staff?.role || "STAFF"}</small>
         </span>
+        <button className="staff-signout" onClick={() => { setMenuOpen(false); navigate("/app/account"); }} aria-label="My account" title="My account / change password"><KeyRound size={18} /></button>
         <button className="staff-signout" onClick={() => setConfirmLogout(true)} aria-label="Sign out" title="Sign out"><LogOut size={18} /></button>
         {confirmLogout && <div className="logout-confirm" role="dialog" aria-label="Confirm sign out"><span>Sign out of this workstation?</span><button onClick={() => setConfirmLogout(false)}>Stay</button><button onClick={() => { logout(); navigate("/login", { replace: true }); }}>Sign out</button></div>}
       </div></div>

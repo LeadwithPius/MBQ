@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -16,6 +17,7 @@ import com.MBQ.dto.AuthDtos;
 import com.MBQ.model.StaffUser;
 import com.MBQ.repository.StaffUserRepository;
 import com.MBQ.security.JwtService;
+import com.MBQ.service.AccountService;
 
 import jakarta.validation.Valid;
 
@@ -27,18 +29,21 @@ public class AuthController {
     private final StaffUserRepository staffUserRepository;
     private final JwtService jwtService;
     private final long expirationMs;
+    private final AccountService accountService;
 
     public AuthController(
             AuthenticationManager authenticationManager,
             StaffUserRepository staffUserRepository,
             JwtService jwtService,
             @Value("${app.jwt.expiration-ms:28800000}")
-            long expirationMs) {
+            long expirationMs,
+            AccountService accountService) {
 
         this.authenticationManager = authenticationManager;
         this.staffUserRepository = staffUserRepository;
         this.jwtService = jwtService;
         this.expirationMs = expirationMs;
+        this.accountService = accountService;
     }
 
    @PostMapping("/login")
@@ -102,5 +107,12 @@ public AuthDtos.LoginResponse login(
                 "Bearer",
                 expirationMs,
                 profile);
+    }
+
+    /** Signed-in staff change their own password (current password required). */
+    @PostMapping("/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@Valid @RequestBody AuthDtos.ChangePasswordRequest request) {
+        accountService.changePassword(request);
     }
 }

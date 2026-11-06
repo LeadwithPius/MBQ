@@ -25,8 +25,24 @@ public final class BloodInventoryDtos {
     public record IssueRequest(
             @NotNull Long stockId,
             @Min(1) int units,
+            @NotBlank @Size(max = 500) String reason,
+            /** Optional: when set, the stock's blood group must be compatible with this patient. */
+            Long patientId
+    ) {}
+
+    /**
+     * Remove units that can no longer be used. EXPIRED writes off everything left in an
+     * expired batch (units is ignored); WASTED removes the given units (broken bag, failed
+     * crossmatch storage, etc.) from any batch.
+     */
+    public record WriteOffRequest(
+            @NotNull Long batchId,
+            @NotNull WriteOffType type,
+            Integer units,
             @NotBlank @Size(max = 500) String reason
     ) {}
+
+    public enum WriteOffType { EXPIRED, WASTED }
 
     public record BatchAllocation(
             Long batchId,

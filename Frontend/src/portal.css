@@ -1340,3 +1340,12 @@
 .report-stock-low{border-color:#f3c2bf;background:#fff6f5}
 @media(max-width:800px){.report-stock{grid-template-columns:repeat(4,1fr)}}
 @media print{.workspace-sidebar,.workspace-topbar,.report-actions{display:none!important}.workspace-main{margin-left:0!important}.panel{break-inside:avoid;box-shadow:none}}
+
+/* Laboratory, donations, account */
+.table-input{min-width:150px;padding:6px 8px;border:1px solid #d6dde6;border-radius:8px;font:inherit;font-size:13px}
+.lab-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.consultation-labs{margin-top:22px;padding-top:18px;border-top:1px solid #e6ebf1}
+.consultation-labs .consultation-section-title .table-action{margin-left:auto}
+.lab-request-form{margin:10px 0 14px}
+.account-panel{max-width:640px}
+.waste-form{margin-top:16px;max-width:640px}

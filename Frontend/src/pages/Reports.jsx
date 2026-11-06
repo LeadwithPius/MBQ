@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, Clock3, Droplet, Printer, RefreshCw, Users } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Clock3, Droplet, FlaskConical, Printer, RefreshCw, Users } from "lucide-react";
 import { api } from "../services/api";
 
 const groupLabel = group => (group || "").replace("_POS", "+").replace("_NEG", "−");
@@ -83,11 +83,22 @@ export function ReportsPage() {
           <dl className="report-figures">
             <div><dt>Units received</dt><dd>{report.unitsReceived}</dd></div>
             <div><dt>Units issued</dt><dd>{report.unitsIssued}</dd></div>
+            <div><dt>Units written off</dt><dd>{report.unitsWrittenOff ?? 0}</dd></div>
+            <div><dt>Donations collected</dt><dd>{report.donationsCollected ?? 0}</dd></div>
+            <div><dt>Donations passed / failed</dt><dd>{report.donationsPassed ?? 0} / {report.donationsFailed ?? 0}</dd></div>
             <div><dt>Donor alerts sent</dt><dd>{report.donorAlertsSent}</dd></div>
             <div><dt>Accepted / declined</dt><dd>{report.donorAlertsAccepted} / {report.donorAlertsDeclined}</dd></div>
           </dl>
         </section>
       </div>
+
+      <section className="panel">
+        <div className="panel-heading"><div><h2>Laboratory</h2><p>Tests ordered from consultations on this day</p></div><FlaskConical size={19} /></div>
+        <dl className="report-figures">
+          <div><dt>Tests requested</dt><dd>{report.labTestsRequested ?? 0}</dd></div>
+          <div><dt>Results completed</dt><dd>{report.labTestsCompleted ?? 0}</dd></div>
+        </dl>
+      </section>
 
       <section className="panel">
         <div className="panel-heading"><div><h2>By department</h2><p>Average wait = time from ticket issued to first being called</p></div></div>
