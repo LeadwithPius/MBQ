@@ -1,6 +1,7 @@
 package com.MBQ.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public final class AuthDtos {
 
@@ -27,5 +28,10 @@ public final class AuthDtos {
             Long departmentId,
             String departmentName,
             Long facilityId) {
+    }
+
+    public record ChangePasswordRequest(
+            @NotBlank String currentPassword,
+            @NotBlank @Size(min = 8, max = 100) String newPassword) {
     }
 }
