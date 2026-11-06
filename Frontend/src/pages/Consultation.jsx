@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ClipboardList, FileText, RefreshCw, Save, Stethoscope } from "lucide-react";
+import { Activity, ClipboardList, FileText, FlaskConical, Plus, RefreshCw, Save, Stethoscope } from "lucide-react";
 import { api } from "../services/api";
 import "./Consultation.css";
 import { useActiveDepartment } from "../context/activeDepartment";
@@ -307,10 +307,81 @@ export function ConsultationPage() {
                 </div>}
                 {selectedIsCompleted && <div className="notice consultation-readonly-notice">This consultation has been finalized and is read-only.</div>}
               </form>
+
+              <LabPanel key={selectedTicket.id} consultation={consultation} patientId={selectedTicket.patientId} canRequest={canEdit && !!consultation?.id} />
             </>
           )}
         </section>
       </div>
     </>
   );
+}
+
+const COMMON_TESTS = ["Full blood count", "Malaria RDT", "Blood grouping & crossmatch", "Random blood sugar", "Urinalysis", "HIV rapid test", "Liver function tests", "Renal function (U&E)", "Pregnancy test", "Sputum GeneXpert"];
+
+/** Workflow B, doctor side: order tests for this visit and read results when the lab completes them. */
+function LabPanel({ consultation, patientId, canRequest }) {
+  const [requests, setRequests] = useState([]);
+  const [previous, setPrevious] = useState([]);
+  const [form, setForm] = useState({ testName: "", clinicalNotes: "", priority: "ROUTINE" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const consultationId = consultation?.id;
+
+  const load = useCallback(async () => {
+    const [current, history] = await Promise.all([
+      consultationId ? api("/lab/requests/consultations/" + consultationId) : Promise.resolve([]),
+      api("/lab/requests/patients/" + patientId),
+    ]);
+    setRequests(Array.isArray(current) ? current : []);
+    setPrevious(Array.isArray(history) ? history.filter(r => r.consultationId !== consultationId && r.status === "COMPLETED") : []);
+  }, [consultationId, patientId]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => { if (active) load().catch(err => setError(err.message)); });
+    // Results arrive from the lab while the doctor is working, so refresh periodically.
+    const timer = window.setInterval(() => { load().catch(() => {}); }, 10000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [load]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true); setError("");
+    try {
+      await api("/lab/requests", { method: "POST", body: { consultationId, testName: form.testName.trim(), clinicalNotes: form.clinicalNotes.trim() || null, priority: form.priority } });
+      setForm({ testName: "", clinicalNotes: "", priority: "ROUTINE" });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="consultation-labs">
+    <div className="consultation-section-title"><FlaskConical size={16} /><h3>Laboratory tests</h3><button type="button" className="table-action" onClick={() => load().catch(err => setError(err.message))}><RefreshCw size={12} /> Refresh</button></div>
+    {error && <div className="form-error">{error}</div>}
+    {!consultationId && <p className="consultation-muted">Save the consultation draft first, then request tests here.</p>}
+    {canRequest && <form className="form-grid lab-request-form" onSubmit={submit}>
+      <label>Test<input required maxLength={120} list="mbq-common-tests" value={form.testName} onChange={e => setForm({ ...form, testName: e.target.value })} placeholder="e.g. Full blood count" /></label>
+      <datalist id="mbq-common-tests">{COMMON_TESTS.map(t => <option key={t} value={t} />)}</datalist>
+      <label>Priority<select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}><option value="ROUTINE">Routine</option><option value="URGENT">Urgent</option></select></label>
+      <label className="span-two">Clinical notes for the lab (optional)<input maxLength={1000} value={form.clinicalNotes} onChange={e => setForm({ ...form, clinicalNotes: e.target.value })} /></label>
+      <button className="button button-outline span-two" disabled={busy || !form.testName.trim()}><Plus size={15} /> Request test</button>
+    </form>}
+    {requests.length > 0 && <div className="table-wrap"><table className="data-table"><thead><tr><th>Test</th><th>Priority</th><th>Status</th><th>Result</th></tr></thead><tbody>
+      {requests.map(r => <tr key={r.id}><td><b>{r.testName}</b>{r.clinicalNotes && <small className="queue-patient-id">{r.clinicalNotes}</small>}</td>
+        <td><span className={"pill " + (r.priority === "URGENT" ? "priority-emergency" : "priority-normal")}>{r.priority}</span></td>
+        <td>{r.status.replace("_", " ")}</td>
+        <td>{r.status === "COMPLETED" ? <>{r.abnormal && <span className="pill priority-emergency">ABNORMAL</span>} {r.resultText}{r.resultNotes && <small className="queue-patient-id">{r.resultNotes}</small>}<small className="queue-patient-id">{r.completedByName} · {new Date(r.completedAt).toLocaleString()}</small></> : r.status === "CANCELLED" ? (r.cancelledReason || "Cancelled") : "Waiting for the lab"}</td></tr>)}
+    </tbody></table></div>}
+    {previous.length > 0 && <details className="consultation-history">
+      <summary>Previous lab results ({previous.length})</summary>
+      {previous.map(r => <article key={r.id} className="consultation-history-item">
+        <div><b>{r.testName}</b>{r.abnormal && <span className="pill priority-emergency">ABNORMAL</span>}<small>{new Date(r.completedAt).toLocaleString()}</small></div>
+        <p>{r.resultText}</p>
+      </article>)}
+    </details>}
+  </section>;
 }
