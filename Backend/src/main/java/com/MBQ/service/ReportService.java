@@ -28,6 +28,11 @@ import com.MBQ.model.QueueTicket;
 import com.MBQ.model.QueueTicketStatusHistory;
 import com.MBQ.model.TicketStatus;
 import com.MBQ.repository.AlertRepository;
+import com.MBQ.repository.BloodDonationRepository;
+import com.MBQ.repository.LabRequestRepository;
+import com.MBQ.model.DonationStatus;
+import com.MBQ.model.LabRequestStatus;
+import java.time.OffsetDateTime;
 import com.MBQ.repository.BloodStockMovementRepository;
 import com.MBQ.repository.BloodStockRepository;
 import com.MBQ.repository.QueueTicketRepository;
@@ -44,6 +49,8 @@ public class ReportService {
     private final BloodStockRepository stocks;
     private final BloodStockMovementRepository movements;
     private final AlertRepository alerts;
+    private final LabRequestRepository labRequests;
+    private final BloodDonationRepository donations;
 
     public ReportService(
             QueueTicketRepository tickets,
@@ -51,13 +58,17 @@ public class ReportService {
             TriageObservationRepository observations,
             BloodStockRepository stocks,
             BloodStockMovementRepository movements,
-            AlertRepository alerts) {
+            AlertRepository alerts,
+            LabRequestRepository labRequests,
+            BloodDonationRepository donations) {
         this.tickets = tickets;
         this.history = history;
         this.observations = observations;
         this.stocks = stocks;
         this.movements = movements;
         this.alerts = alerts;
+        this.labRequests = labRequests;
+        this.donations = donations;
     }
 
     @Transactional(readOnly = true)
@@ -111,9 +122,12 @@ public class ReportService {
 
         long unitsReceived = 0;
         long unitsIssued = 0;
+        long unitsWrittenOff = 0;
         for (BloodStockMovement m : movements.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to)) {
             if (m.getMovementType() == BloodStockMovementType.RECEIVED) unitsReceived += m.getUnitsChanged();
             if (m.getMovementType() == BloodStockMovementType.ISSUED) unitsIssued += m.getUnitsChanged();
+            if (m.getMovementType() == BloodStockMovementType.EXPIRED
+                    || m.getMovementType() == BloodStockMovementType.WASTED) unitsWrittenOff += m.getUnitsChanged();
         }
 
         List<Alert> dayAlerts = alerts.findByDateSentGreaterThanEqualAndDateSentLessThan(from, to);
@@ -121,8 +135,17 @@ public class ReportService {
         long declined = dayAlerts.stream().filter(a -> "DECLINED".equals(a.getResponseStatus())).count();
 
         ZoneId zone = ZoneId.systemDefault();
-        long triage = observations.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                from.atZone(zone).toOffsetDateTime(), to.atZone(zone).toOffsetDateTime());
+        OffsetDateTime fromTz = from.atZone(zone).toOffsetDateTime();
+        OffsetDateTime toTz = to.atZone(zone).toOffsetDateTime();
+        long triage = observations.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(fromTz, toTz);
+        long labRequested = labRequests.countByRequestedAtGreaterThanEqualAndRequestedAtLessThan(fromTz, toTz);
+        long labCompleted = labRequests.countByStatusAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
+                LabRequestStatus.COMPLETED, fromTz, toTz);
+        long donationsCollected = donations.countByCollectedAtGreaterThanEqualAndCollectedAtLessThan(fromTz, toTz);
+        long donationsPassed = donations.countByStatusAndScreenedAtGreaterThanEqualAndScreenedAtLessThan(
+                DonationStatus.PASSED, fromTz, toTz);
+        long donationsFailed = donations.countByStatusAndScreenedAtGreaterThanEqualAndScreenedAtLessThan(
+                DonationStatus.FAILED, fromTz, toTz);
 
         List<BloodStock> allStock = new ArrayList<>(stocks.findAll());
         allStock.sort(Comparator
@@ -157,7 +180,13 @@ public class ReportService {
                         .map(d -> new DepartmentRow(d.id, d.name, d.tickets, d.completed, d.cancelled,
                                 d.stillWaiting, average(d.waits)))
                         .toList(),
-                stockRows);
+                stockRows,
+                unitsWrittenOff,
+                labRequested,
+                labCompleted,
+                donationsCollected,
+                donationsPassed,
+                donationsFailed);
     }
 
     static Double average(List<Long> values) {

@@ -57,7 +57,13 @@ public final class ReportDtos {
             List<CountRow> byStatus,
             List<CountRow> byPriority,
             List<DepartmentRow> byDepartment,
-            List<StockRow> stock) {}
+            List<StockRow> stock,
+            long unitsWrittenOff,
+            long labTestsRequested,
+            long labTestsCompleted,
+            long donationsCollected,
+            long donationsPassed,
+            long donationsFailed) {}
 
     public record DepartmentResponse(
             Long id,

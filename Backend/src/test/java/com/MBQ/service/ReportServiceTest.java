@@ -40,6 +40,8 @@ class ReportServiceTest {
     @Mock private BloodStockRepository stocks;
     @Mock private BloodStockMovementRepository movements;
     @Mock private AlertRepository alerts;
+    @Mock private com.MBQ.repository.LabRequestRepository labRequests;
+    @Mock private com.MBQ.repository.BloodDonationRepository donations;
 
     private static final LocalDate DAY = LocalDate.of(2026, 11, 11);
 
@@ -86,7 +88,7 @@ class ReportServiceTest {
         when(movements.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(any(), any()))
                 .thenReturn(List.of(issued));
 
-        DailyReportResponse report = new ReportService(tickets, history, observations, stocks, movements, alerts)
+        DailyReportResponse report = new ReportService(tickets, history, observations, stocks, movements, alerts, labRequests, donations)
                 .daily(DAY);
 
         assertEquals(3, report.totalTickets());
@@ -102,7 +104,7 @@ class ReportServiceTest {
 
     @Test
     void daily_emptyDay_hasNoAverageWait() {
-        DailyReportResponse report = new ReportService(tickets, history, observations, stocks, movements, alerts)
+        DailyReportResponse report = new ReportService(tickets, history, observations, stocks, movements, alerts, labRequests, donations)
                 .daily(DAY);
 
         assertEquals(0, report.totalTickets());

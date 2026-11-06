@@ -30,4 +30,7 @@ public interface BloodDonationRepository extends JpaRepository<BloodDonation, Lo
     List<BloodDonation> findByDonor_IdOrderByCollectedAtDesc(Long donorId);
 
     long countByCollectedAtGreaterThanEqualAndCollectedAtLessThan(OffsetDateTime from, OffsetDateTime to);
+
+    long countByStatusAndScreenedAtGreaterThanEqualAndScreenedAtLessThan(
+            com.MBQ.model.DonationStatus status, OffsetDateTime from, OffsetDateTime to);
 }
