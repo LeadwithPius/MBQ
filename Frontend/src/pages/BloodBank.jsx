@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, PackagePlus, RefreshCw, Send, UserPlus } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, HeartHandshake, PackagePlus, RefreshCw, Send, UserPlus, XCircle } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
 
@@ -41,6 +41,7 @@ export function BloodBankPage() {
   const [requests, setRequests] = useState([]);
   const [donors, setDonors] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [donations, setDonations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -49,13 +50,15 @@ export function BloodBankPage() {
 
   const load = useCallback(async () => {
     try {
-      const [stockData, requestData, donorData, alertData, forecastData] = await Promise.all([
+      const [stockData, requestData, donorData, alertData, forecastData, donationData] = await Promise.all([
         api("/blood-bank/stock"),
         api("/blood-bank/requests"),
         canManage ? api("/blood-bank/donors") : Promise.resolve([]),
         canManage ? api("/blood-bank/alerts") : Promise.resolve([]),
         api("/blood-intelligence/forecast"),
+        canManage ? api("/blood-bank/donations") : Promise.resolve([]),
       ]);
+      setDonations(Array.isArray(donationData) ? donationData : []);
       setStock(Array.isArray(stockData) ? stockData : []);
       setForecasts(Array.isArray(forecastData) ? forecastData : []);
       setRequests(Array.isArray(requestData) ? requestData : []);
@@ -143,20 +146,22 @@ export function BloodBankPage() {
         </button>)}</div>}
     </section>
 
-    {selected && <StockDetail key={selected.stockId} item={selected} canManage={canManage} canIssue={canIssue} canLedger={canLedger} busy={busy} run={run} />}
+    {selected && <StockDetail key={selected.stockId} item={selected} patients={requests} canManage={canManage} canIssue={canIssue} canLedger={canLedger} busy={busy} run={run} />}
 
     {canManage && <div className="two-column">
       <DonorsPanel donors={donors} busy={busy} run={run} />
       <AlertsPanel alerts={alerts} busy={busy} run={run} />
     </div>}
+
+    {canManage && <DonationsPanel donors={donors} donations={donations} busy={busy} run={run} />}
   </>;
 }
 
-function StockDetail({ item, canManage, canIssue, canLedger, busy, run }) {
+function StockDetail({ item, patients = [], canManage, canIssue, canLedger, busy, run }) {
   const [batches, setBatches] = useState([]);
   const [movements, setMovements] = useState([]);
   const [receive, setReceive] = useState({ batchReference: "", expiryDate: "", units: "", sourceReference: "", reason: "Received from regional blood service" });
-  const [issue, setIssue] = useState({ units: "", reason: "" });
+  const [issue, setIssue] = useState({ units: "", reason: "", patientId: "" });
   const [threshold, setThreshold] = useState(String(item.lowStockThreshold));
   const [today] = useState(() => new Date().toISOString().slice(0, 10)); // earliest allowed expiry
   const label = groupLabel(item.bloodGroup);
@@ -192,9 +197,9 @@ function StockDetail({ item, canManage, canIssue, canLedger, busy, run }) {
     const ok = await run(() => api("/blood-bank/inventory/issues", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey() },
-      body: { stockId: item.stockId, units: Number(issue.units), reason: issue.reason.trim() },
+      body: { stockId: item.stockId, units: Number(issue.units), reason: issue.reason.trim(), patientId: issue.patientId ? Number(issue.patientId) : null },
     }), result => "Issued " + result.unitsChanged + " unit(s) of " + label + " from " + result.allocations.map(a => a.batchReference).join(", ") + " (soonest expiry first). Stock is now " + result.quantityAfter + ".");
-    if (ok) setIssue({ units: "", reason: "" });
+    if (ok) setIssue({ units: "", reason: "", patientId: "" });
   }
 
   const saveThreshold = event => {
@@ -222,7 +227,11 @@ function StockDetail({ item, canManage, canIssue, canLedger, busy, run }) {
         <h3 className="span-two"><Send size={16} /> Issue units</h3>
         <label>Units<input type="number" min="1" max={item.issuableUnits || undefined} required value={issue.units} onChange={e => setIssue({ ...issue, units: e.target.value })} /></label>
         <label>Reason<input required maxLength={500} value={issue.reason} onChange={e => setIssue({ ...issue, reason: e.target.value })} placeholder="e.g. Emergency transfusion, ticket F1-…" /></label>
-        <p className="span-two blood-form-hint">Units are taken from the batch that expires soonest (FEFO). Expired and unverified units are never issued.</p>
+        <label className="span-two">For patient (compatibility check)<select value={issue.patientId} onChange={e => setIssue({ ...issue, patientId: e.target.value })}>
+          <option value="">Not for a listed patient</option>
+          {patients.map(p => <option key={p.ticketId} value={p.patientId}>{p.patientName} · {p.ticketNumber} · {p.patientBloodGroup ? groupLabel(p.patientBloodGroup) : "group unknown"}</option>)}
+        </select></label>
+        <p className="span-two blood-form-hint">Choosing a patient blocks incompatible blood (ABO/RhD); an unknown group only allows O−. Units are taken from the batch that expires soonest (FEFO). Expired and unverified units are never issued.</p>
         <button className="button button-primary span-two" disabled={busy || item.issuableUnits === 0}>Issue {label} units</button>
       </form>}
     </div>}
@@ -286,5 +295,58 @@ function AlertsPanel({ alerts, busy, run }) {
           ? <span className="alert-row-actions"><button className="table-action" disabled={busy} onClick={() => reply(a, "ACCEPTED")}><CheckCircle2 size={12} /> Accepted</button><button className="table-action" disabled={busy} onClick={() => reply(a, "DECLINED")}>Declined</button></span>
           : <span className={"pill " + (a.responseStatus === "ACCEPTED" ? "status-waiting" : "priority-normal")}>{a.responseStatus}</span>}
       </div>)}</div>}
+  </section>;
+}
+
+/** Workflow C: record a donation, then screen it. Only a passed donation becomes stock (as a batch awaiting verification). */
+function DonationsPanel({ donors, donations, busy, run }) {
+  const eligible = donors.filter(d => d.eligible);
+  const [form, setForm] = useState({ donorId: "", units: "1" });
+  const [notes, setNotes] = useState({});
+  const awaiting = donations.filter(d => d.status === "COLLECTED");
+  const screened = donations.filter(d => d.status !== "COLLECTED").slice(0, 15);
+
+  async function submit(event) {
+    event.preventDefault();
+    const donor = donors.find(d => String(d.id) === form.donorId);
+    const ok = await run(() => api("/blood-bank/donations", { method: "POST", body: { donorId: Number(form.donorId), units: Number(form.units) } }),
+      "Donation from " + (donor?.name || "donor") + " recorded. It is not in stock until it passes screening.");
+    if (ok) setForm({ donorId: "", units: "1" });
+  }
+
+  const screen = (d, passed) => run(
+    () => api("/blood-bank/donations/" + d.id + "/screen", { method: "PATCH", body: { passed, notes: (notes[d.id] || "").trim() || null } }),
+    result => passed
+      ? d.donorName + "'s donation passed. Batch " + result.batchReference + " (" + result.units + " " + groupLabel(result.bloodGroup) + ") was added and must be verified before it can be issued."
+      : d.donorName + "'s donation failed screening and was discarded. Stock was not changed.");
+
+  return <section className="panel">
+    <div className="panel-heading"><div><h2>Donations</h2><p>Collected blood enters stock only after it passes screening</p></div><HeartHandshake size={19} /></div>
+    <form className="form-grid" onSubmit={submit}>
+      <label>Donor<select required value={form.donorId} onChange={e => setForm({ ...form, donorId: e.target.value })}>
+        <option value="">Select an eligible donor</option>
+        {eligible.map(d => <option key={d.id} value={d.id}>{d.name} · {groupLabel(d.bloodGroup)}</option>)}
+      </select></label>
+      <label>Units<select value={form.units} onChange={e => setForm({ ...form, units: e.target.value })}><option value="1">1</option><option value="2">2</option></select></label>
+      <p className="span-two blood-form-hint">A donor must wait 56 days between donations. Ineligible donors cannot be selected.</p>
+      <button className="button button-primary span-two" disabled={busy || !form.donorId}><HeartHandshake size={15} /> Record donation</button>
+    </form>
+
+    <h3 className="blood-subheading">Awaiting screening ({awaiting.length})</h3>
+    {awaiting.length === 0 ? <div className="empty-panel">No donations waiting for screening.</div> :
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Donor</th><th>Group</th><th>Units</th><th>Collected</th><th>Screening notes</th><th>Outcome</th></tr></thead><tbody>
+        {awaiting.map(d => <tr key={d.id}><td><b>{d.donorName}</b></td><td>{groupLabel(d.bloodGroup)}</td><td>{d.units}</td><td>{formatDateTime(d.collectedAt)}</td>
+          <td><input className="table-input" maxLength={1000} value={notes[d.id] || ""} onChange={e => setNotes({ ...notes, [d.id]: e.target.value })} placeholder="e.g. TTI screen negative" /></td>
+          <td><span className="alert-row-actions"><button className="table-action" disabled={busy} onClick={() => screen(d, true)}><CheckCircle2 size={12} /> Passed</button><button className="table-action table-action-blood" disabled={busy} onClick={() => screen(d, false)}><XCircle size={12} /> Failed</button></span></td></tr>)}
+      </tbody></table></div>}
+
+    {screened.length > 0 && <>
+      <h3 className="blood-subheading">Recently screened</h3>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Donor</th><th>Group</th><th>Units</th><th>Result</th><th>Batch</th><th>Notes</th></tr></thead><tbody>
+        {screened.map(d => <tr key={d.id}><td><b>{d.donorName}</b><small className="queue-patient-id">{formatDateTime(d.screenedAt)} · {d.screenedByName}</small></td><td>{groupLabel(d.bloodGroup)}</td><td>{d.units}</td>
+          <td>{d.status === "PASSED" ? <span className="pill priority-normal">PASSED</span> : <span className="pill priority-emergency">FAILED</span>}</td>
+          <td>{d.batchReference ? <>{d.batchReference} <small className="queue-patient-id">{String(d.batchVerificationStatus || "").replaceAll("_", " ")}</small></> : "—"}</td><td>{d.screeningNotes || "—"}</td></tr>)}
+      </tbody></table></div>
+    </>}
   </section>;
 }
