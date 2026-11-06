@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ClipboardList, FileText, RefreshCw, Save, Stethoscope } from "lucide-react";
 import { api } from "../services/api";
+import "./Consultation.css";
 import { useActiveDepartment } from "../context/activeDepartment";
 import { useAuth } from "../context/useAuth";
 
@@ -83,7 +84,12 @@ export function ConsultationPage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    api(departmentId ? "/queue/departments/" + departmentId + "/in-progress" : "/queue/departments/0/in-progress")
+    if (!departmentId) {
+      setTickets([]);
+      setLoading(false);
+      return () => { active = false; };
+    }
+    api("/queue/departments/" + departmentId + "/in-progress")
       .then(rows => {
         if (!active) return;
         setTickets(Array.isArray(rows) ? rows : []);
@@ -182,7 +188,7 @@ export function ConsultationPage() {
       setConsultation(completed);
       setNotice("Consultation completed and the patient has been removed from the active queue.");
       setSelectedTicket(current => current ? { ...current, status: "COMPLETED" } : current);
-      await loadTickets();
+      setTickets(current => current.filter(ticket => ticket.id !== selectedTicket.id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -274,12 +280,12 @@ export function ConsultationPage() {
               <form className="consultation-form" onSubmit={saveDraft}>
                 <div className="consultation-section-title"><ClipboardList size={16} /><h3>Clinical consultation notes</h3></div>
                 <div className="consultation-form-grid">
-                  <Field label="Presenting complaint" name="presentingComplaint" value={form.presentingComplaint} onChange={updateField} required readOnly={!canEdit} />
+                  <Field label="Presenting complaint" name="presentingComplaint" value={form.presentingComplaint} onChange={updateField} readOnly={!canEdit} />
                   <Field label="History of present illness" name="historyOfPresentIllness" value={form.historyOfPresentIllness} onChange={updateField} readOnly={!canEdit} />
                   <Field label="Relevant medical history" name="medicalHistory" value={form.medicalHistory} onChange={updateField} readOnly={!canEdit} />
                   <Field label="Examination findings" name="examinationFindings" value={form.examinationFindings} onChange={updateField} readOnly={!canEdit} />
-                  <Field label="Diagnosis" name="diagnosis" value={form.diagnosis} onChange={updateField} required readOnly={!canEdit} />
-                  <Field label="Treatment plan" name="treatmentPlan" value={form.treatmentPlan} onChange={updateField} required readOnly={!canEdit} />
+                  <Field label="Diagnosis" name="diagnosis" value={form.diagnosis} onChange={updateField} readOnly={!canEdit} />
+                  <Field label="Treatment plan" name="treatmentPlan" value={form.treatmentPlan} onChange={updateField} readOnly={!canEdit} />
                   <Field label="Prescriptions" name="prescriptions" value={form.prescriptions} onChange={updateField} readOnly={!canEdit} />
                   <Field label="Investigations requested" name="investigations" value={form.investigations} onChange={updateField} readOnly={!canEdit} />
                   <Field label="Follow-up instructions" name="followUp" value={form.followUp} onChange={updateField} readOnly={!canEdit} />
