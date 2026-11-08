@@ -341,7 +341,6 @@ export function PatientsPage() {
   const { staff } = useAuth();
   const [searchParams] = useSearchParams();
   const highlightId = Number(searchParams.get("patientId")) || null;
-  const { departmentId, facilityId } = useActiveDepartment();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -357,15 +356,19 @@ export function PatientsPage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([api("/patients"), api("/departments")])
-      .then(([patientRows, departmentRows]) => {
+    Promise.allSettled([api("/patients"), api("/departments")])
+      .then(([patientResult, departmentResult]) => {
         if (!active) return;
-        setPatients(Array.isArray(patientRows) ? patientRows : []);
-        setDepartments(Array.isArray(departmentRows) ? departmentRows : []);
-        setError("");
-      })
-      .catch(err => {
-        if (active) setError(err.message);
+        if (patientResult.status === "fulfilled") {
+          setPatients(Array.isArray(patientResult.value) ? patientResult.value : []);
+        } else {
+          setError(patientResult.reason.message);
+        }
+        if (departmentResult.status === "fulfilled") {
+          setDepartments(Array.isArray(departmentResult.value) ? departmentResult.value : []);
+        } else {
+          setError("Could not load departments: " + departmentResult.reason.message);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -396,16 +399,20 @@ export function PatientsPage() {
           facilityId: Number(selectedDepartment.facilityId),
         },
       });
-      await api("/queue/tickets", {
-        method: "POST",
-        body: {
-          patientId: patient.id,
-          departmentId: selectedDepartment.id,
-          priorityLevel: "NORMAL",
-          requiresBlood: false,
-        },
-      });
-      setNotice("Patient registered and added to the " + selectedDepartment.name + " queue.");
+      try {
+        await api("/queue/tickets", {
+          method: "POST",
+          body: {
+            patientId: patient.id,
+            departmentId: selectedDepartment.id,
+            priorityLevel: "NORMAL",
+            requiresBlood: false,
+          },
+        });
+        setNotice("Patient registered and added to the " + selectedDepartment.name + " queue.");
+      } catch (ticketError) {
+        setNotice("Patient registered successfully, but the " + selectedDepartment.name + " queue ticket was not created: " + ticketError.message);
+      }
       setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "", departmentId: "" });
       await load();
     } catch (err) {
