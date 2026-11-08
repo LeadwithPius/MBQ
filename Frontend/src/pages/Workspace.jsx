@@ -347,7 +347,8 @@ export function PatientsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
+  const [departments, setDepartments] = useState([]);
+  const [form, setForm] = useState({ name: "", age: "", sex: "", contact: "", bloodGroup: "", departmentId: "" });
   const load = useCallback(async () => {
     try { const data = await api("/patients"); setPatients(Array.isArray(data) ? data : []); setError(""); }
     catch (err) { setError(err.message); }
@@ -356,10 +357,11 @@ export function PatientsPage() {
   useEffect(() => {
     let active = true;
 
-    api("/patients")
-      .then(data => {
+    Promise.all([api("/patients"), api("/departments")])
+      .then(([patientRows, departmentRows]) => {
         if (!active) return;
-        setPatients(Array.isArray(data) ? data : []);
+        setPatients(Array.isArray(patientRows) ? patientRows : []);
+        setDepartments(Array.isArray(departmentRows) ? departmentRows : []);
         setError("");
       })
       .catch(err => {
@@ -381,18 +383,38 @@ export function PatientsPage() {
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
-      const patient = await api("/patients", { method: "POST", body: { ...form, age: form.age === "" ? null : Number(form.age), bloodGroup: form.bloodGroup || null, facilityId: Number(form.facilityId || facilityId) } });
-      try {
-        if (!departmentId) throw new Error("Patient registered, but no department is selected, so a queue ticket was not created.");
-        await api("/queue/tickets", { method: "POST", body: { patientId: patient.id, departmentId, priorityLevel: "NORMAL", requiresBlood: false } });
-        setNotice("Patient registered and added to your department queue.");
-      } catch (ticketError) { setNotice("Patient registered successfully. Queue ticket not created: " + ticketError.message); }
-      setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "", facilityId: staff?.facilityId || "" });
+      const selectedDepartment = departments.find(item => item.id === Number(form.departmentId));
+      if (!selectedDepartment) throw new Error("Choose a valid department before registering the patient.");
+      const patient = await api("/patients", {
+        method: "POST",
+        body: {
+          name: form.name,
+          age: form.age === "" ? null : Number(form.age),
+          sex: form.sex,
+          contact: form.contact,
+          bloodGroup: form.bloodGroup || null,
+          facilityId: Number(selectedDepartment.facilityId),
+        },
+      });
+      await api("/queue/tickets", {
+        method: "POST",
+        body: {
+          patientId: patient.id,
+          departmentId: selectedDepartment.id,
+          priorityLevel: "NORMAL",
+          requiresBlood: false,
+        },
+      });
+      setNotice("Patient registered and added to the " + selectedDepartment.name + " queue.");
+      setForm({ name: "", age: "", sex: "", contact: "", bloodGroup: "", departmentId: "" });
       await load();
-    } catch (err) { setError(err.message); }
-    finally { setBusy(false); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
-  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column">{(["ADMIN", "RECEPTIONIST"].includes(staff?.role)) ? <section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details</p></div></div><form className="form-grid" onSubmit={submit}>{staff?.role === "ADMIN" && !facilityId && <label className="span-two">Facility ID<input type="number" min="1" required value={form.facilityId} onChange={e => setForm({ ...form, facilityId: e.target.value })} /></label>}<label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}<button className="button button-primary span-two" disabled={busy || !(form.facilityId || facilityId)}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section> : <section className="panel"><div className="empty-panel">Your staff role does not have permission to register patients. You can still view your facility's patient directory.</div></section>}<section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div id={"patient-" + p.id} className={"patient-list-row" + (p.id === highlightId ? " patient-list-row-highlight" : "")} key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
+  return <><PageHeading title="Patient registration" description="Register a patient and, when assigned to a department, create their queue ticket." /><div className="two-column">{(["ADMIN", "RECEPTIONIST", "NURSE"].includes(staff?.role)) ? <section className="panel form-panel"><div className="panel-heading"><div><h2>New patient</h2><p>Enter the patient's details and choose the destination department.</p></div></div><form className="form-grid" onSubmit={submit}><label className="span-two">Assign to department<select required value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })} disabled={!departments.length}><option value="">Choose a department…</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}{staff?.role === "ADMIN" ? " · " + d.facilityName : ""}</option>)}</select></label><label className="span-two">Full name<input required maxLength={255} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Age<input type="number" min="0" max="130" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} /></label><label>Sex<input maxLength={255} value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })} placeholder="Optional" /></label><label>Contact<input maxLength={255} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Phone or other contact" /></label><label>Blood group<select value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })}><option value="">Not recorded</option>{["A_POS","A_NEG","B_POS","B_NEG","AB_POS","AB_NEG","O_POS","O_NEG"].map(v => <option key={v}>{v}</option>)}</select></label>{error && <div className="form-error span-two">{error}</div>}{notice && <div className="notice span-two">{notice}</div>}{!departments.length && <div className="notice notice-warning span-two">No departments are available for this facility. Ask an administrator to configure departments before registering patients.</div>}<button className="button button-primary span-two" disabled={busy || !form.departmentId || !departments.length}>{busy ? "Saving patient…" : <><Plus size={16} /> Register patient</>}</button></form></section> : <section className="panel"><div className="empty-panel">Your staff role does not have permission to register patients. You can still view your facility's patient directory.</div></section>}<section className="panel"><div className="panel-heading"><div><h2>Patient directory</h2><p>Patients registered at your facility</p></div><button className="button button-outline" onClick={load}>Refresh</button></div>{loading ? <div className="empty-panel">Loading patients…</div> : patients.length ? <div className="patient-list">{patients.map(p => <div id={"patient-" + p.id} className={"patient-list-row" + (p.id === highlightId ? " patient-list-row-highlight" : "")} key={p.id}><span className="patient-initials">{p.name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase()}</span><span><b>{p.name}</b><small>Patient #{p.id} · {p.age ?? "Age not recorded"}</small></span></div>)}</div> : <div className="empty-panel">No patient records returned.</div>}</section></div></>;
 }
 
 export function TriagePage() {
