@@ -116,6 +116,33 @@ public class StaffAccessService {
         requireFacilityAccess(department.getFacility().getId());
     }
 
+    /**
+     * Receptionists and nurses may route a patient to any department in their
+     * own facility. This is intentionally separate from operational queue
+     * access, which remains restricted to the staff member's assigned department.
+     */
+    public void requireDepartmentAssignmentAccess(Department department) {
+        if (department == null || department.getFacility() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Department not found");
+        }
+
+        StaffUser staff = currentStaff();
+        if (isAdmin(staff)) {
+            return;
+        }
+
+        if (staff.getRole() != Role.RECEPTIONIST && staff.getRole() != Role.NURSE) {
+            throw forbidden();
+        }
+
+        Long staffFacilityId = facilityIdOf(staff);
+        if (!Objects.equals(staffFacilityId, department.getFacility().getId())) {
+            throw forbidden();
+        }
+    }
+
     public void requirePatientFacilityAccess(Patient patient) {
         if (patient == null || patient.getFacility() == null) {
             throw forbidden();
