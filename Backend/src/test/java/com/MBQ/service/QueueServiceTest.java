@@ -134,6 +134,7 @@ class QueueServiceTest {
                         new CreateTicketRequest(100L, 10L, PriorityLevel.NORMAL, null, false)));
 
         assertEquals(409, error.getStatusCode().value());
+        verify(staffAccess).requireDepartmentAssignmentAccess(opd);
         // No ticket number may be used up for a rejected request.
         verifyNoInteractions(jdbcTemplate);
     }
