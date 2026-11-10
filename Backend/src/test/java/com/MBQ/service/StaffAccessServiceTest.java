@@ -89,6 +89,49 @@ class StaffAccessServiceTest {
     }
 
     @Test
+    void receptionistCanAssignPatientToAnotherDepartmentInSameFacility() {
+        StaffUser receptionist =
+                staff("reception", Role.RECEPTIONIST, department(10L, 1L));
+        when(staffUsers.findByUsername("test-user"))
+                .thenReturn(Optional.of(receptionist));
+
+        assertDoesNotThrow(
+                () -> access.requireDepartmentAssignmentAccess(department(11L, 1L)));
+    }
+
+    @Test
+    void nurseCanAssignPatientToAnotherDepartmentInSameFacility() {
+        StaffUser nurse = staff("nurse", Role.NURSE, department(10L, 1L));
+        when(staffUsers.findByUsername("test-user"))
+                .thenReturn(Optional.of(nurse));
+
+        assertDoesNotThrow(
+                () -> access.requireDepartmentAssignmentAccess(department(11L, 1L)));
+    }
+
+    @Test
+    void departmentAssignmentCannotCrossFacilityBoundary() {
+        StaffUser nurse = staff("nurse", Role.NURSE, department(10L, 1L));
+        when(staffUsers.findByUsername("test-user"))
+                .thenReturn(Optional.of(nurse));
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> access.requireDepartmentAssignmentAccess(department(20L, 2L)));
+    }
+
+    @Test
+    void doctorCannotAssignPatientsToOtherDepartments() {
+        StaffUser doctor = staff("doctor", Role.DOCTOR, department(10L, 1L));
+        when(staffUsers.findByUsername("test-user"))
+                .thenReturn(Optional.of(doctor));
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> access.requireDepartmentAssignmentAccess(department(11L, 1L)));
+    }
+
+    @Test
     void inactiveStaffCannotAccessResources() {
         StaffUser nurse = staff("nurse", Role.NURSE, department(10L, 1L));
         nurse.setActive(false);

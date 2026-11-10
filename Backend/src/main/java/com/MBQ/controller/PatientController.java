@@ -53,7 +53,7 @@ public class PatientController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'NURSE')")
     public PatientResponse registerPatient(
             @Valid @RequestBody PatientRegistrationRequest request) {
         return queueService.registerPatient(request);

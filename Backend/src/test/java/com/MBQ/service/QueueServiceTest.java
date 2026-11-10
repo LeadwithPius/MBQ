@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -123,6 +124,34 @@ class QueueServiceTest {
     }
 
     @Test
+    void createTicket_assignsPatientToSelectedNonOpdDepartment() {
+        Department cardiology = new Department();
+        cardiology.setId(11L);
+        cardiology.setName("Cardiology");
+        cardiology.setFacility(opd.getFacility());
+
+        StaffUser receptionist = new StaffUser();
+        receptionist.setId(5L);
+        when(patientRepository.findById(100L)).thenReturn(Optional.of(patient));
+        when(departmentRepository.findById(11L)).thenReturn(Optional.of(cardiology));
+        when(queueTicketRepository.existsByPatient_IdAndStatusIn(eq(100L), anyCollection()))
+                .thenReturn(false);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(), any(), any()))
+                .thenReturn(1);
+        when(queueTicketRepository.saveAndFlush(any(QueueTicket.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(staffAccess.currentStaff()).thenReturn(receptionist);
+
+        TicketResponse response = queueService.createTicket(
+                new CreateTicketRequest(100L, 11L, PriorityLevel.NORMAL, null, false));
+
+        assertEquals(11L, response.departmentId());
+        assertEquals("Cardiology", response.departmentName());
+        verify(staffAccess).requireDepartmentAssignmentAccess(cardiology);
+        verify(historyRepository).save(any(QueueTicketStatusHistory.class));
+    }
+
+    @Test
     void createTicket_patientWithActiveTicket_isRejectedWith409() {
         when(patientRepository.findById(100L)).thenReturn(Optional.of(patient));
         when(departmentRepository.findById(10L)).thenReturn(Optional.of(opd));
@@ -134,6 +163,7 @@ class QueueServiceTest {
                         new CreateTicketRequest(100L, 10L, PriorityLevel.NORMAL, null, false)));
 
         assertEquals(409, error.getStatusCode().value());
+        verify(staffAccess).requireDepartmentAssignmentAccess(opd);
         // No ticket number may be used up for a rejected request.
         verifyNoInteractions(jdbcTemplate);
     }

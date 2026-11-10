@@ -29,7 +29,7 @@ The login page calls `POST /api/auth/login`. The access token is stored in sessi
 - Queue: `GET /api/queue/departments/{departmentId}/waiting`, `POST /api/queue/tickets`, `POST /api/queue/departments/{departmentId}/call-next`, `PATCH /api/queue/tickets/{ticketId}/status`
 - Triage: observation creation, patient observation lookup, assessment lookup and clinician review under `/api/triage`
 
-The patient-list and queue-ticket-creation endpoints were added in this integration branch. Patient listing is scoped to the authenticated staff member's facility. Queue-ticket creation and patient registration enforce facility scope for non-admin staff.
+Patient listing and department discovery are scoped to the authenticated staff member's facility (administrators can see all facilities). Receptionists and nurses select a destination department when registering a patient; the selected department determines the queue ticket. Patient registration and queue-ticket creation enforce facility scope on the backend, while operational queue access remains restricted to the staff member's assigned department.
 
 Blood-bank and reporting screens remain explicitly marked as pending because those backend APIs are not yet exposed. They do not display mock records or invented metrics.
 

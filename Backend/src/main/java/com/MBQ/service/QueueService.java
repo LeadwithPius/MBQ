@@ -93,7 +93,9 @@ public class QueueService {
 
         Department department = requireDepartment(request.departmentId());
 
-        staffAccess.requireDepartmentAccess(department);
+        // Receptionists and nurses can route a patient to any department in
+        // their own facility; day-to-day queue operations remain department-scoped.
+        staffAccess.requireDepartmentAssignmentAccess(department);
         staffAccess.requirePatientFacilityAccess(patient);
 
         Long departmentFacilityId = department.getFacility().getId();

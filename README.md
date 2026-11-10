@@ -9,7 +9,7 @@ MBQ digitises reception and triage queue management and gives lab/blood bank sta
 Modules
 
 Module	What it does
-Reception	Registers patients and generates timestamped queue tickets assigned to a department.
+Reception	Registers patients and generates timestamped queue tickets. Receptionists and nurses choose the destination department within their facility.
 Queue dashboard	Shows live ticket order, status and position; nurses can call the next patient and triage staff can flag priority.
 Clinical triage	Nurses record observations and vitals; doctors review risk recommendations and read the nurse's notes.
 Doctor consultations	Doctors document presenting complaints, history, examination, diagnosis, treatment, prescriptions, investigations and follow-up; finalized notes are read-only.
@@ -88,7 +88,10 @@ The main implemented workflow endpoints are listed below.
 
 Area	Method & path	Roles
 Auth	POST /api/auth/login	Public
-Patients	GET/POST /api/patients	Admin, Doctor, Nurse, Receptionist (POST: Admin, Receptionist)
+Patients	GET /api/patients	Admin, Doctor, Nurse, Receptionist
+Patients	POST /api/patients	Admin, Receptionist, Nurse
+Departments	GET /api/departments	Authenticated staff (admin: all facilities; other staff: own facility)
+Queue	POST /api/queue/tickets	Admin, Receptionist, Nurse (assignment is facility-scoped; queue operations remain department-scoped)
 Queue	GET /api/queue/departments/{departmentId}/waiting	Admin, Doctor, Nurse, Receptionist
 Queue	GET /api/queue/departments/{departmentId}/in-progress	Admin, Doctor, Nurse, Receptionist
 Queue	POST /api/queue/departments/{departmentId}/call-next	Admin, Doctor, Nurse
