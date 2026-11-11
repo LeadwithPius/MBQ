@@ -44,18 +44,24 @@ public class BloodIntelligenceMlClient {
     }
 
     public MlResponse forecast(List<SeriesInput> series) {
-        if (client == null || series == null || series.isEmpty()) {
-            return null;
-        }
+        if (series == null || series.isEmpty()) return null;
+        return post("/forecast", new ForecastRequest(series));
+    }
+
+    public MlResponse demoForecast() {
+        return post("/demo-forecast", null);
+    }
+
+    private MlResponse post(String path, Object body) {
+        if (client == null) return null;
         try {
-            RestClient.RequestBodySpec request = client.post().uri("/forecast")
-                    .contentType(MediaType.APPLICATION_JSON);
-            if (!apiKey.isBlank()) {
-                request.header("X-API-Key", apiKey);
-            }
-            return request.body(new ForecastRequest(series)).retrieve().body(MlResponse.class);
+            RestClient.RequestBodySpec request = client.post().uri(path);
+            if (!apiKey.isBlank()) request.header("X-API-Key", apiKey);
+            if (body == null) return request.retrieve().body(MlResponse.class);
+            return request.contentType(MediaType.APPLICATION_JSON)
+                    .body(body).retrieve().body(MlResponse.class);
         } catch (RestClientException ex) {
-            log.warn("XGBoost blood forecast unavailable; using the Java baseline: {}", ex.getMessage());
+            log.warn("XGBoost service request {} failed: {}", path, ex.getMessage());
             return null;
         }
     }
@@ -65,7 +71,10 @@ public class BloodIntelligenceMlClient {
             List<DailyDemand> dailyDemand) {}
     public record DailyDemand(LocalDate date, int unitsIssued) {}
     public record MlResponse(String status, String modelVersion, Double validationMae,
-            Double baselineMae, String message, List<StockForecast> forecasts) {}
+            Double baselineMae, String message, List<StockForecast> forecasts,
+            Boolean synthetic, String dataSource, Integer seriesCount,
+            Integer facilityCount, Integer bloodGroups, Integer historyDays,
+            String notice) {}
     public record StockForecast(Long stockId, int predictedDemand7Days,
             int predictedDemand14Days) {}
 }

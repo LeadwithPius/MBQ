@@ -177,3 +177,61 @@ def forecast(payload: ForecastRequest, x_api_key: str | None = Header(default=No
             "validationMae": round(xgb_mae, 4), "baselineMae": round(baseline_mae, 4),
             "message": "XGBoost passed chronological holdout comparison against the moving-average baseline.",
             "forecasts": results}
+
+
+@app.post("/demo-forecast")
+def demo_forecast(x_api_key: str | None = Header(default=None)):
+    """Deterministic synthetic data for demonstrations; never reads or writes hospital data."""
+    expected_key = os.getenv("ML_API_KEY", "")
+    if expected_key and not hmac.compare_digest(x_api_key or "", expected_key):
+        raise HTTPException(status_code=401, detail="Invalid ML service API key")
+
+    import random
+
+    rng = random.Random(20261111)
+    today = date.today()
+    start = today - timedelta(days=364)
+    facilities = [101, 102, 103]
+    blood_groups = ["O_POS", "O_NEG", "A_POS", "A_NEG",
+                    "B_POS", "B_NEG", "AB_POS", "AB_NEG"]
+    series = []
+    stock_id = 900001
+
+    for facility_index, facility_id in enumerate(facilities):
+        for group_index, blood_group in enumerate(blood_groups):
+            base = 4.0 + (group_index % 4) * 1.8 + facility_index * 1.2
+            rows = []
+            for offset in range(365):
+                day = start + timedelta(days=offset)
+                weekday_factor = [1.18, 1.12, 1.08, 1.02, 0.98, 0.70, 0.62][day.weekday()]
+                annual_factor = 1.0 + 0.16 * math.sin(
+                    2 * math.pi * (day.timetuple().tm_yday - 35) / 365.25
+                )
+                gradual_trend = 1.0 + 0.00055 * offset
+                campaign_spike = 1.0
+                if offset % 97 in range(4):
+                    campaign_spike = 1.55
+                noise = rng.uniform(0.78, 1.22)
+                demand = max(0, int(round(
+                    base * weekday_factor * annual_factor
+                    * gradual_trend * campaign_spike * noise
+                )))
+                rows.append(DailyDemand(date=day, unitsIssued=demand))
+            series.append(SeriesInput(
+                stockId=stock_id, facilityId=facility_id,
+                bloodGroup=blood_group, dailyDemand=rows
+            ))
+            stock_id += 1
+
+    result = forecast(ForecastRequest(series=series), x_api_key)
+    result["dataSource"] = "SYNTHETIC_DEMO"
+    result["synthetic"] = True
+    result["seriesCount"] = len(series)
+    result["facilityCount"] = len(facilities)
+    result["bloodGroups"] = len(blood_groups)
+    result["historyDays"] = 365
+    result["notice"] = (
+        "Generated demonstration data only. These forecasts do not represent "
+        "real patients, facilities, stock, or clinical demand."
+    )
+    return result
