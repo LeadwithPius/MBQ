@@ -77,6 +77,9 @@ public class BloodRequestService {
         if (bloodRequest.getStatus() != BloodRequestStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be reviewed.");
         }
+        if (request.status() != BloodRequestStatus.APPROVED && request.status() != BloodRequestStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A request can only be approved or rejected during review.");
+        }
         bloodRequest.setStatus(request.status());
         bloodRequest.setReviewedBy(actor);
         bloodRequest.setReviewedAt(OffsetDateTime.now());
