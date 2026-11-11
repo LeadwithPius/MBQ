@@ -91,3 +91,17 @@ button:disabled {
   font-weight: 600;
   line-height: 1.4;
 }
+
+/* Blood request workflow controls */
+.blood-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 190px;
+}
+.blood-request-actions select,
+.blood-request-actions input {
+  min-width: 150px;
+  max-width: 220px;
+}
