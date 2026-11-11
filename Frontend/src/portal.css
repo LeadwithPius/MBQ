@@ -1349,3 +1349,33 @@
 .lab-request-form{margin:10px 0 14px}
 .account-panel{max-width:640px}
 .waste-form{margin-top:16px;max-width:640px}
+
+
+/* Blood-request approval and fulfilment actions: readable at normal zoom. */
+.blood-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 230px;
+}
+.blood-request-actions .table-action {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  border-radius: 8px;
+}
+.blood-request-actions select,
+.blood-request-actions input {
+  min-height: 38px;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .blood-request-actions .table-action {
+    min-height: 42px;
+    padding: 9px 15px;
+    font-size: 14px;
+  }
+}

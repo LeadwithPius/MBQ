@@ -373,19 +373,33 @@ function BloodRequestsPanel({ requests, patients, stock, canRequest, canReview, 
     "Blood request #" + request.id + " " + status.toLowerCase() + "."
   );
 
-  const fulfil = request => {
+  const fulfil = async request => {
     const stockId = Number(stockChoices[request.id]);
     if (!stockId) return;
     const selectedStock = stock.find(item => item.stockId === stockId);
-    return run(
+    const completed = await run(
       () => api("/blood-bank/blood-requests/" + request.id + "/fulfil", {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey() },
         body: { stockId },
       }),
-      result => "Request #" + request.id + " fulfilled. " + result.unitsChanged + " unit(s) issued from " +
-        (selectedStock ? groupLabel(selectedStock.bloodGroup) : "selected stock") + "."
+      () => "Request #" + request.id + " fulfilled. " + request.units + " unit(s) issued from " +
+        (selectedStock ? groupLabel(selectedStock.bloodGroup) : "selected stock") + ". Inventory has been updated."
     );
+    if (completed) {
+      // Refresh the two operational records directly so stock changes are visible
+      // even if an unrelated dashboard request (e.g. forecasting) is unavailable.
+      try {
+        const [stockData, requestData] = await Promise.all([
+          api("/blood-bank/stock"),
+          api("/blood-bank/blood-requests"),
+        ]);
+        setStock(Array.isArray(stockData) ? stockData : []);
+        setBloodRequests(Array.isArray(requestData) ? requestData : []);
+      } catch (refreshError) {
+        setError("The request was fulfilled, but the latest stock totals could not be refreshed: " + refreshError.message);
+      }
+    }
   };
 
   return <section className="panel blood-requests-panel">
