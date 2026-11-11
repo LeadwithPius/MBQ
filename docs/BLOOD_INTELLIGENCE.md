@@ -51,3 +51,17 @@ For local use, run the service from `ml-service/` with `python -m pip install -r
 3. Persist model artifacts and training metadata in durable storage if training latency or reproducibility requires it.
 4. Add integration tests for the Python service, service authentication, timeout/fallback behavior, and PostgreSQL data access.
 5. Reconcile legacy donor facility assignments and complete the existing audit/notification work.
+
+
+## Synthetic presentation mode
+
+The Blood Bank dashboard includes a **Run synthetic ML demo** action. It calls the authenticated backend route `GET /api/blood-intelligence/demo-forecast`, which proxies to the Python service's `POST /demo-forecast` route.
+
+- Generates deterministic, synthetic daily issue histories for 3 simulated facilities, 8 blood groups and 365 days (24 stock series).
+- Includes weekday effects, gradual demand changes, annual seasonality, periodic campaign spikes and deterministic noise.
+- Runs the same XGBoost training and chronological holdout comparison as operational forecasting.
+- Returns a `synthetic: true` marker and `dataSource: "SYNTHETIC_DEMO"`; the UI labels the output as demo data.
+- Does not read from or write to Neon, create inventory movements, or alter patients, batches, donors or live stock.
+- The demo endpoint uses the same ML API key and staff authentication as the normal blood-intelligence routes.
+
+For a presentation, explain that the sample is generated to demonstrate the pipeline and algorithm. Its MAE is a proof-of-concept metric on synthetic data, not evidence of accuracy on real hospital demand. The demo endpoint is intended for controlled presentations and should be disabled or access-restricted in a production environment if it is not needed.
