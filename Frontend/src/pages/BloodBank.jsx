@@ -6,7 +6,9 @@ import { useAuth } from "../context/useAuth";
 // Who may do what (mirrors the backend @PreAuthorize rules).
 const MANAGE_ROLES = ["ADMIN", "LAB_STAFF"];            // receive stock, donors, alerts, thresholds
 const ISSUE_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];   // issue units
-const LEDGER_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];  // movement history
+const LEDGER_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR", "NURSE"];  // movement history
+const REQUEST_ROLES = ["DOCTOR", "NURSE"];
+const REVIEW_REQUEST_ROLES = ["ADMIN", "LAB_STAFF"];
 
 const GROUPS = ["A_POS", "A_NEG", "B_POS", "B_NEG", "AB_POS", "AB_NEG", "O_POS", "O_NEG"];
 const OUTFLOW = ["ISSUED", "EXPIRED", "WASTED", "TRANSFER_OUT", "ADJUSTMENT_OUT"];
@@ -36,12 +38,16 @@ export function BloodBankPage() {
   const canManage = MANAGE_ROLES.includes(role);
   const canIssue = ISSUE_ROLES.includes(role);
   const canLedger = LEDGER_ROLES.includes(role);
+  const canRequest = REQUEST_ROLES.includes(role);
+  const canReviewRequests = REVIEW_REQUEST_ROLES.includes(role);
 
   const [stock, setStock] = useState([]);
   const [forecasts, setForecasts] = useState([]);
   const [demoResult, setDemoResult] = useState(null);
   const [demoLoading, setDemoLoading] = useState(false);
-  const [requests, setRequests] = useState([]);
+  const [requests, setRequests] = useState([]); // triage flags on active queue tickets
+  const [bloodRequests, setBloodRequests] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [donors, setDonors] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [donations, setDonations] = useState([]);
@@ -53,9 +59,11 @@ export function BloodBankPage() {
 
   const load = useCallback(async () => {
     try {
-      const [stockData, requestData, donorData, alertData, forecastData, donationData] = await Promise.all([
+      const [stockData, requestData, bloodRequestData, patientData, donorData, alertData, forecastData, donationData] = await Promise.all([
         api("/blood-bank/stock"),
         api("/blood-bank/requests"),
+        api("/blood-bank/blood-requests"),
+        canRequest ? api("/patients") : Promise.resolve([]),
         canManage ? api("/blood-bank/donors") : Promise.resolve([]),
         canManage ? api("/blood-bank/alerts") : Promise.resolve([]),
         api("/blood-intelligence/forecast"),
@@ -65,6 +73,8 @@ export function BloodBankPage() {
       setStock(Array.isArray(stockData) ? stockData : []);
       setForecasts(Array.isArray(forecastData) ? forecastData : []);
       setRequests(Array.isArray(requestData) ? requestData : []);
+      setBloodRequests(Array.isArray(bloodRequestData) ? bloodRequestData : []);
+      setPatients(Array.isArray(patientData) ? patientData : []);
       setDonors(Array.isArray(donorData) ? donorData : []);
       setAlerts(Array.isArray(alertData) ? alertData : []);
       setError("");
@@ -73,12 +83,27 @@ export function BloodBankPage() {
     } finally {
       setLoading(false);
     }
-  }, [canManage]);
+  }, [canManage, canRequest]);
 
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => { if (active) load(); });
-    return () => { active = false; };
+    // Stock levels and request status are shared operational data. Poll so
+    // changes made by another staff member appear without a manual refresh.
+    const timer = window.setInterval(async () => {
+      try {
+        const [stockData, requestData] = await Promise.all([
+          api("/blood-bank/stock"),
+          api("/blood-bank/blood-requests"),
+        ]);
+        if (!active) return;
+        setStock(Array.isArray(stockData) ? stockData : []);
+        setBloodRequests(Array.isArray(requestData) ? requestData : []);
+      } catch {
+        // Keep the last successful snapshot visible during temporary outages.
+      }
+    }, 10000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [load]);
 
   async function runSyntheticDemo() {
@@ -162,6 +187,16 @@ export function BloodBankPage() {
       {canManage && <button className="button button-primary" disabled={busy} onClick={() => notifyDonors(item)}><BellRing size={15} /> Notify donors</button>}
     </div>)}
 
+    {(canRequest || canReviewRequests || bloodRequests.length > 0) && <BloodRequestsPanel
+      requests={bloodRequests}
+      patients={patients}
+      stock={stock}
+      canRequest={canRequest}
+      canReview={canReviewRequests}
+      busy={busy}
+      run={run}
+    />}
+
     {requests.length > 0 && <section className="panel blood-requests-panel">
       <div className="panel-heading"><div><h2>Patients needing blood</h2><p>Flagged by triage and still in the queue</p></div><Droplet size={19} /></div>
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Ticket</th><th>Patient</th><th>Blood group</th><th>Department</th><th>Priority</th><th>Status</th></tr></thead><tbody>
@@ -189,6 +224,101 @@ export function BloodBankPage() {
 
     {canManage && <DonationsPanel donors={donors} donations={donations} busy={busy} run={run} />}
   </>;
+}
+
+
+function BloodRequestsPanel({ requests, patients, stock, canRequest, canReview, busy, run }) {
+  const [form, setForm] = useState({ patientId: "", units: "1", priorityLevel: "NORMAL", reason: "" });
+  const [stockChoices, setStockChoices] = useState({});
+  const [reviewNotes, setReviewNotes] = useState({});
+
+  async function submit(event) {
+    event.preventDefault();
+    const patient = patients.find(item => String(item.id) === form.patientId);
+    const ok = await run(
+      () => api("/blood-bank/blood-requests", {
+        method: "POST",
+        body: {
+          patientId: Number(form.patientId),
+          units: Number(form.units),
+          priorityLevel: form.priorityLevel,
+          reason: form.reason.trim(),
+        },
+      }),
+      "Blood request submitted for " + (patient?.name || "the selected patient") + ". It is now awaiting blood-bank review."
+    );
+    if (ok) setForm({ patientId: "", units: "1", priorityLevel: "NORMAL", reason: "" });
+  }
+
+  const review = (request, status) => run(
+    () => api("/blood-bank/blood-requests/" + request.id + "/review", {
+      method: "PATCH",
+      body: { status, notes: (reviewNotes[request.id] || "").trim() || null },
+    }),
+    "Blood request #" + request.id + " " + status.toLowerCase() + "."
+  );
+
+  const fulfil = request => {
+    const stockId = Number(stockChoices[request.id]);
+    if (!stockId) return;
+    const selectedStock = stock.find(item => item.stockId === stockId);
+    return run(
+      () => api("/blood-bank/blood-requests/" + request.id + "/fulfil", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey() },
+        body: { stockId },
+      }),
+      result => "Request #" + request.id + " fulfilled. " + result.units + " unit(s) issued from " +
+        (selectedStock ? groupLabel(selectedStock.bloodGroup) : "selected stock") + "."
+    );
+  };
+
+  return <section className="panel blood-requests-panel">
+    <div className="panel-heading">
+      <div><h2>Blood requests</h2><p>Clinical requests, blood-bank approval and controlled fulfilment · updates automatically every 10 seconds</p></div>
+      <Droplet size={19} />
+    </div>
+    {canRequest && <form className="form-grid blood-form" onSubmit={submit}>
+      <h3 className="span-two">Request blood for a patient</h3>
+      <label>Patient<select required value={form.patientId} onChange={e => setForm({ ...form, patientId: e.target.value })}>
+        <option value="">Select patient</option>
+        {patients.map(patient => <option key={patient.id} value={patient.id}>
+          {patient.name} · #{patient.id} · {patient.bloodGroup ? groupLabel(patient.bloodGroup) : "Blood group unknown"}
+        </option>)}
+      </select></label>
+      <label>Units<input type="number" min="1" max="10" required value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></label>
+      <label>Priority<select value={form.priorityLevel} onChange={e => setForm({ ...form, priorityLevel: e.target.value })}>
+        <option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="EMERGENCY">Emergency</option>
+      </select></label>
+      <label className="span-two">Clinical reason<input required maxLength={500} value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Ongoing blood loss following trauma" /></label>
+      <p className="span-two blood-form-hint">Requests are linked to a patient and facility. The blood bank must approve them before units can be issued. Compatibility is checked again during fulfilment.</p>
+      <button className="button button-primary span-two" disabled={busy || !patients.length || !form.patientId}>Submit blood request</button>
+    </form>}
+
+    <h3 className="blood-subheading">Request register ({requests.length})</h3>
+    {requests.length === 0 ? <div className="empty-panel">No formal blood requests have been submitted.</div> :
+      <div className="table-wrap"><table className="data-table"><thead><tr>
+        <th>Patient</th><th>Group</th><th>Units</th><th>Priority</th><th>Reason</th><th>Requested by</th><th>Status</th>{canReview && <th>Blood-bank action</th>}
+      </tr></thead><tbody>{requests.map(request => <tr key={request.id}>
+        <td><b>{request.patientName}</b><small className="queue-patient-id">Patient #{request.patientId}</small></td>
+        <td>{request.bloodGroup ? <b>{groupLabel(request.bloodGroup)}</b> : "Unknown"}</td>
+        <td>{request.units}</td>
+        <td><span className={"pill priority-" + String(request.priorityLevel).toLowerCase()}>{request.priorityLevel}</span></td>
+        <td>{request.reason}</td><td>{request.requestedBy}<small className="queue-patient-id">{formatDateTime(request.requestedAt)}</small></td>
+        <td><span className={"pill " + (request.status === "FULFILLED" ? "status-waiting" : request.status === "REJECTED" ? "priority-emergency" : "priority-urgent")}>{request.status}</span>{request.reviewNotes && <small className="queue-patient-id">{request.reviewNotes}</small>}</td>
+        {canReview && <td>{request.status === "PENDING" ? <div className="blood-request-actions">
+          <input className="table-input" maxLength={500} placeholder="Review note (optional)" value={reviewNotes[request.id] || ""} onChange={e => setReviewNotes(current => ({ ...current, [request.id]: e.target.value }))} />
+          <button className="table-action" disabled={busy} onClick={() => review(request, "APPROVED")}>Approve</button>
+          <button className="table-action table-action-blood" disabled={busy} onClick={() => review(request, "REJECTED")}>Reject</button>
+        </div> : request.status === "APPROVED" ? <div className="blood-request-actions">
+          <select aria-label={"Stock for request " + request.id} value={stockChoices[request.id] || ""} onChange={e => setStockChoices(current => ({ ...current, [request.id]: e.target.value }))}>
+            <option value="">Select compatible stock</option>
+            {stock.filter(item => item.issuableUnits > 0).map(item => <option key={item.stockId} value={item.stockId}>{groupLabel(item.bloodGroup)} · {item.issuableUnits} issuable</option>)}
+          </select>
+          <button className="table-action" disabled={busy || !stockChoices[request.id]} onClick={() => fulfil(request)}>Fulfil & issue</button>
+        </div> : request.status === "FULFILLED" ? <small>Issued from stock #{request.stockId}</small> : "—"}</td>}
+      </tr>)}</tbody></table></div>}
+  </section>;
 }
 
 function StockDetail({ item, patients = [], canManage, canIssue, canLedger, busy, run }) {
