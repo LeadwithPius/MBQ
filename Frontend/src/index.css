@@ -60,3 +60,34 @@ button:disabled {
   background: #dbe7ff;
   color: #142b4a;
 }
+
+
+/* Triage form validation states */
+.form-grid label.field-invalid {
+  padding: 10px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #991b1b;
+}
+.form-grid label.field-invalid input,
+.form-grid label.field-invalid select,
+.form-grid label.field-invalid textarea {
+  border-color: #dc2626;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.08);
+}
+.form-grid label.field-invalid input:focus,
+.form-grid label.field-invalid select:focus,
+.form-grid label.field-invalid textarea:focus {
+  outline: 3px solid rgba(220, 38, 38, 0.18);
+  outline-offset: 1px;
+}
+.field-error-message {
+  display: block;
+  margin-top: 6px;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
