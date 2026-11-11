@@ -1,31 +1,53 @@
-# Blood intelligence implementation (Stages 1–4)
+# Blood intelligence and XGBoost forecasting
 
 ## Current implementation
 
-- Low-stock flags on the blood-bank stock endpoint now compare the threshold with verified, unexpired, issuable units rather than the aggregate physical balance.
-- Newly received batches enter `PENDING_VERIFICATION`; they are excluded from FEFO issuing until a lab/admin user verifies them through `PATCH /api/blood-bank/inventory/batches/{batchId}/verify`.
-- Donor records now support a facility association. Non-admin donor listing and donor mobilisation are scoped to the authenticated staff facility. Existing donor rows remain unassigned after migration and are not visible to non-admin facility users until reconciled by an administrator.
-- `GET /api/blood-intelligence/forecast` returns a transparent 28-calendar-day issue-history baseline for each visible stock record. It includes usable stock, daily average demand, 7/14-day expected demand, estimated stock-out days, risk and a replenishment estimate.
-- The Blood Bank page displays this forecast and exposes batch verification for lab/admin users.
+- Low-stock flags use verified, unexpired, issuable units rather than the aggregate physical balance.
+- Newly received batches enter `PENDING_VERIFICATION` and are excluded from FEFO issuing until verified.
+- `GET /api/blood-intelligence/forecast` now supports two forecast methods:
+  - **XGBoost regression** from the optional Python ML service, using up to 365 days of daily `ISSUED` ledger history per facility and blood group.
+  - **28-day moving-average fallback** in the Java backend whenever the ML service is not configured, unavailable, short of data, or fails the validation comparison.
+- XGBoost uses calendar features (day of week and annual seasonality), lags (1, 7, 14, 28 days), rolling means (7, 14, 28 days), facility and blood-group indicators.
+- The model is trained as a pooled regression model across the stock series included in the authenticated user's facility scope. It uses `reg:squarederror`.
+- A chronological 14-day holdout is compared with the moving-average baseline. XGBoost is selected only when its holdout MAE is at least 2% lower than the baseline MAE. Otherwise, the API returns the Java baseline.
+- The API response includes `forecastMethod`, `modelVersion`, and `validationMae`. The Blood Bank page displays the selected method and validation MAE.
 
-## Forecast methodology and safety limits
+## Deploying the ML service
 
-The first version is deliberately explainable, not an ML model. It sums `ISSUED` ledger units in the previous 28 days and divides by 28. It requires at least three distinct days with issue activity before showing a forecast. It uses verified, unexpired batch balances as usable stock.
+The Python service is independent of the Spring Boot backend and is located in `ml-service/`.
 
-The replenishment estimate is `max(0, 14-day forecast demand - usable stock)`. Risk bands are based on estimated days until stock-out: critical (<=3), high (<=7), moderate (<=14), low (>14). When history is insufficient, the API returns `INSUFFICIENT_DATA` and does not invent a forecast.
+1. Create a new Render **Private Service** (or web service if private services are unavailable) from this repository.
+2. Set the root directory to `ml-service`, runtime to **Docker**, and Dockerfile path to `Dockerfile`.
+3. Add a strong random `ML_API_KEY` environment variable to the Python service.
+4. Deploy it and copy its internal service URL (preferred when the backend can reach it).
+5. In the existing Render MBQ backend service, add:
+   - `BLOOD_INTELLIGENCE_ML_URL` = the ML service URL, without a trailing slash.
+   - `BLOOD_INTELLIGENCE_ML_API_KEY` = the exact same secret used by the ML service.
+6. Redeploy the backend after saving its environment variables.
 
-This is a planning aid, not a clinical recommendation. Validate the baseline against local data before operational use.
+The ML service exposes `GET /health` and `POST /forecast`. The backend sends daily issue totals; the Python service does not connect directly to Neon and does not receive database credentials. If the ML service is down or its URL is blank, blood-bank forecasting continues with the Java baseline.
 
-## Remaining work before production
+For local use, run the service from `ml-service/` with `python -m pip install -r requirements.txt` and `uvicorn app:app --reload --port 8000`. Set `ML_API_KEY` in the Python process and set `BLOOD_INTELLIGENCE_ML_URL=http://localhost:8000` plus the matching `BLOOD_INTELLIGENCE_ML_API_KEY` for the backend.
 
-1. Complete a first-class blood request lifecycle (requested, approved, allocated, fulfilled, cancelled, unfulfilled) and record unmet demand. The current baseline uses fulfilled issue movements only and can understate demand.
-2. Add an administrator workflow to assign/reconcile legacy donors whose `facility_id` is null, and a facility selector for administrators creating donors.
-3. Add stock reconciliation reports and controlled compensating adjustments.
-4. Expand verification audit metadata (verifier, timestamp, checks performed) and separation-of-duties policy.
-5. Add forecasting backtests, error metrics, seasonality, confidence intervals, minimum-history policy and model versioning before replacing the baseline with a trained model.
-6. Add integration tests against PostgreSQL for V10, facility isolation, batch verification and concurrent inventory operations.
-7. Add real notification-provider integration only after donor consent, delivery tracking, retry and opt-out are implemented.
+## Model eligibility and limitations
 
-## Local verification
+- XGBoost needs at least 120 training rows, 20 training days with non-zero issues, and 20 chronological validation rows. Insufficient data results in the baseline, not fabricated ML output.
+- The model is retrained when a forecast request reaches the ML service; the current implementation does not persist a trained model artifact between requests.
+- The source ledger records fulfilled `ISSUED` movements, not every requested unit. Unfulfilled or cancelled requests are not yet included, so the forecast is a prediction of recorded fulfilled consumption and can understate unmet demand.
+- The model is a planning aid. It must not authorize blood issuance, replace compatibility checks, override FEFO, bypass verification, or change low-stock safety rules.
+- Do not claim that XGBoost is active until the ML service has been deployed, the backend environment variables have been configured, and the API response reports `forecastMethod: "XGBOOST"`.
 
-Run backend tests and frontend lint/build after pulling this branch. Apply Flyway V10 on a test database first; do not use a production database for initial verification.
+## Existing blood-bank safeguards
+
+- Only verified and unexpired batches contribute to usable inventory.
+- FEFO issuing and ABO/RhD compatibility checks remain authoritative.
+- Low-stock thresholds and inventory operations remain independent of the forecasting model.
+- Forecasts do not make clinical decisions or automatically issue or order blood.
+
+## Next steps before operational reliance
+
+1. Capture the full blood-request lifecycle, including unmet demand, so forecasts represent demand rather than only fulfilled consumption.
+2. Run rolling-origin backtests over multiple time windows and blood groups; monitor MAE and bias after deployment.
+3. Persist model artifacts and training metadata in durable storage if training latency or reproducibility requires it.
+4. Add integration tests for the Python service, service authentication, timeout/fallback behavior, and PostgreSQL data access.
+5. Reconcile legacy donor facility assignments and complete the existing audit/notification work.
