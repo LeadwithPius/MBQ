@@ -104,20 +104,31 @@ public class TriageController {
         String formError = null;
         if (detail.equals("patientId is required") || detail.equals("Patient not found")) {
             fieldErrors.put("patientId", detail);
-        } else if (detail.equals("Queue ticket not found")) {
+        } else if (detail.equals("Queue ticket not found")
+                || detail.equals("queueTicketId is required")) {
             fieldErrors.put("queueTicketId", detail);
-        } else if (detail.startsWith("systolicBp must be")) {
+        } else if (detail.equals("systolicBp is required")
+                || detail.startsWith("systolicBp must be")) {
             fieldErrors.put("systolicBp", detail);
-        } else if (detail.startsWith("diastolicBp must be")) {
+        } else if (detail.equals("diastolicBp is required")
+                || detail.startsWith("diastolicBp must be")) {
             fieldErrors.put("diastolicBp", detail);
-        } else if (detail.startsWith("temperatureC must be")) {
-            fieldErrors.put("temperatureC", detail);
-        } else if (detail.startsWith("heartRate must be")) {
+        } else if (detail.equals("heartRate is required")
+                || detail.startsWith("heartRate must be")) {
             fieldErrors.put("heartRate", detail);
-        } else if (detail.startsWith("respiratoryRate must be")) {
+        } else if (detail.equals("temperatureC is required")
+                || detail.startsWith("temperatureC must be")) {
+            fieldErrors.put("temperatureC", detail);
+        } else if (detail.equals("respiratoryRate is required")
+                || detail.startsWith("respiratoryRate must be")) {
             fieldErrors.put("respiratoryRate", detail);
-        } else if (detail.startsWith("spo2Percent must be")) {
+        } else if (detail.equals("spo2Percent is required")
+                || detail.startsWith("spo2Percent must be")) {
             fieldErrors.put("spo2Percent", detail);
+        } else if (detail.equals("symptoms is required")) {
+            fieldErrors.put("symptoms", detail);
+        } else if (detail.equals("notes is required")) {
+            fieldErrors.put("notes", detail);
         } else if (detail.startsWith("Systolic blood pressure")) {
             fieldErrors.put("systolicBp", detail);
             fieldErrors.put("diastolicBp", detail);

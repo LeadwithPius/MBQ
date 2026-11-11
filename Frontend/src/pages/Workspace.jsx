@@ -244,9 +244,21 @@ function useQueueActions(refresh) {
     canPrioritize: PRIORITY_ROLES.includes(role),
     canTriage: TRIAGE_RECORD_ROLES.includes(role),
     canFinish: FINISH_TICKET_ROLES.includes(role),
-    callNext: () => run(
-      () => api("/queue/departments/" + departmentId + "/call-next", { method: "POST" }),
-      called => (called?.patientName ? called.patientName + " has been called." : "The next patient has been called.")),
+    callNext: async () => {
+      setBusy(true);
+      setMessage("");
+      try {
+        const called = await api("/queue/departments/" + departmentId + "/call-next", { method: "POST" });
+        if (!called?.patientId || !called?.id) {
+          throw new Error("The queue returned an incomplete patient record. Refresh the queue and try again.");
+        }
+        navigate("/app/triage?patientId=" + called.patientId + "&ticketId=" + called.id);
+      } catch (err) {
+        setMessage(err.message);
+      } finally {
+        setBusy(false);
+      }
+    },
     toggleBlood: row => run(
       () => api("/queue/tickets/" + row.id + "/priority", { method: "PATCH", body: { priorityLevel: row.priorityLevel, requiresBlood: !row.requiresBlood } }),
       row.patientName + (row.requiresBlood ? ": blood request cleared." : " flagged as needing blood. The blood bank can see this request.")),
@@ -477,6 +489,10 @@ export function TriagePage() {
     if (!form.patientId || !Number.isInteger(patientId) || patientId < 1) {
       next.patientId = "Enter a valid patient ID.";
     }
+    const queueTicketId = Number(form.queueTicketId);
+    if (!form.queueTicketId || !Number.isInteger(queueTicketId) || queueTicketId < 1) {
+      next.queueTicketId = "Enter a valid queue ticket ID.";
+    }
     const checks = [
       ["systolicBp", 30, 300, "Systolic BP must be between 30 and 300 mmHg."],
       ["diastolicBp", 20, 200, "Diastolic BP must be between 20 and 200 mmHg."],
@@ -486,10 +502,15 @@ export function TriagePage() {
       ["spo2Percent", 0, 100, "SpO₂ must be between 0 and 100%."],
     ];
     checks.forEach(([key, min, max, message]) => {
-      if (form[key] === "") return;
+      if (form[key] === "") {
+        next[key] = "This field is required.";
+        return;
+      }
       const value = Number(form[key]);
       if (!Number.isFinite(value) || value < min || value > max) next[key] = message;
     });
+    if (!form.symptoms.trim()) next.symptoms = "Enter the patient's symptoms.";
+    if (!form.notes.trim()) next.notes = "Enter the clinical notes.";
     if (form.systolicBp !== "" && form.diastolicBp !== ""
         && Number(form.systolicBp) <= Number(form.diastolicBp)) {
       const message = "Systolic BP must be greater than diastolic BP.";
@@ -566,18 +587,18 @@ export function TriagePage() {
   return <>
     <PageHeading title="Clinical triage" description="Record observations and review preliminary risk assessments. Clinical decisions remain with qualified staff." />
     {canRecord && <section className="panel form-panel">
-      <div className="panel-heading"><div><h2>Record observations</h2><p>Enter the patient and available vital signs</p></div></div>
+      <div className="panel-heading"><div><h2>Record observations</h2><p>All patient, queue, vital-sign and clinical-note fields are required.</p></div></div>
       <form className="form-grid" noValidate onSubmit={submit}>
         <label className={fieldErrors.patientId ? "field-invalid" : ""}>Patient ID<input name="patientId" type="number" min="1" required aria-invalid={Boolean(fieldErrors.patientId)} aria-describedby={fieldErrors.patientId ? "patientId-error" : undefined} value={form.patientId} onChange={e => update("patientId", e.target.value)} />{fieldErrors.patientId && <small className="field-error-message" id="patientId-error">{fieldErrors.patientId}</small>}</label>
-        <label className={fieldErrors.queueTicketId ? "field-invalid" : ""}>Queue ticket ID<input name="queueTicketId" type="number" min="1" aria-invalid={Boolean(fieldErrors.queueTicketId)} aria-describedby={fieldErrors.queueTicketId ? "queueTicketId-error" : undefined} value={form.queueTicketId} onChange={e => update("queueTicketId", e.target.value)} />{fieldErrors.queueTicketId && <small className="field-error-message" id="queueTicketId-error">{fieldErrors.queueTicketId}</small>}</label>
-        <label className={fieldErrors.systolicBp ? "field-invalid" : ""}>Systolic BP (mmHg)<input name="systolicBp" type="number" min="1" aria-invalid={Boolean(fieldErrors.systolicBp)} aria-describedby={fieldErrors.systolicBp ? "systolicBp-error" : undefined} value={form.systolicBp} onChange={e => update("systolicBp", e.target.value)} />{fieldErrors.systolicBp && <small className="field-error-message" id="systolicBp-error">{fieldErrors.systolicBp}</small>}</label>
-        <label className={fieldErrors.diastolicBp ? "field-invalid" : ""}>Diastolic BP (mmHg)<input name="diastolicBp" type="number" min="1" aria-invalid={Boolean(fieldErrors.diastolicBp)} aria-describedby={fieldErrors.diastolicBp ? "diastolicBp-error" : undefined} value={form.diastolicBp} onChange={e => update("diastolicBp", e.target.value)} />{fieldErrors.diastolicBp && <small className="field-error-message" id="diastolicBp-error">{fieldErrors.diastolicBp}</small>}</label>
-        <label className={fieldErrors.heartRate ? "field-invalid" : ""}>Heart rate (bpm)<input name="heartRate" type="number" min="1" max="300" aria-invalid={Boolean(fieldErrors.heartRate)} aria-describedby={fieldErrors.heartRate ? "heartRate-error" : undefined} value={form.heartRate} onChange={e => update("heartRate", e.target.value)} />{fieldErrors.heartRate && <small className="field-error-message" id="heartRate-error">{fieldErrors.heartRate}</small>}</label>
-        <label className={fieldErrors.respiratoryRate ? "field-invalid" : ""}>Respiratory rate (/min)<input name="respiratoryRate" type="number" min="1" max="100" aria-invalid={Boolean(fieldErrors.respiratoryRate)} aria-describedby={fieldErrors.respiratoryRate ? "respiratoryRate-error" : undefined} value={form.respiratoryRate} onChange={e => update("respiratoryRate", e.target.value)} />{fieldErrors.respiratoryRate && <small className="field-error-message" id="respiratoryRate-error">{fieldErrors.respiratoryRate}</small>}</label>
-        <label className={fieldErrors.temperatureC ? "field-invalid" : ""}>Temperature (°C)<input name="temperatureC" type="number" min="25" max="45" step="0.1" aria-invalid={Boolean(fieldErrors.temperatureC)} aria-describedby={fieldErrors.temperatureC ? "temperatureC-error" : undefined} value={form.temperatureC} onChange={e => update("temperatureC", e.target.value)} />{fieldErrors.temperatureC && <small className="field-error-message" id="temperatureC-error">{fieldErrors.temperatureC}</small>}</label>
-        <label className={fieldErrors.spo2Percent ? "field-invalid" : ""}>SpO₂ (%)<input name="spo2Percent" type="number" min="0" max="100" aria-invalid={Boolean(fieldErrors.spo2Percent)} aria-describedby={fieldErrors.spo2Percent ? "spo2Percent-error" : undefined} value={form.spo2Percent} onChange={e => update("spo2Percent", e.target.value)} />{fieldErrors.spo2Percent && <small className="field-error-message" id="spo2Percent-error">{fieldErrors.spo2Percent}</small>}</label>
-        <label className="span-two">Symptoms<textarea rows="3" value={form.symptoms} onChange={e => update("symptoms", e.target.value)} /></label>
-        <label className="span-two">Clinical notes<textarea rows="3" value={form.notes} onChange={e => update("notes", e.target.value)} /></label>
+        <label className={fieldErrors.queueTicketId ? "field-invalid" : ""}>Queue ticket ID<input name="queueTicketId" type="number" min="1" required aria-invalid={Boolean(fieldErrors.queueTicketId)} aria-describedby={fieldErrors.queueTicketId ? "queueTicketId-error" : undefined} value={form.queueTicketId} onChange={e => update("queueTicketId", e.target.value)} />{fieldErrors.queueTicketId && <small className="field-error-message" id="queueTicketId-error">{fieldErrors.queueTicketId}</small>}</label>
+        <label className={fieldErrors.systolicBp ? "field-invalid" : ""}>Systolic BP (mmHg)<input name="systolicBp" type="number" required min="1" aria-invalid={Boolean(fieldErrors.systolicBp)} aria-describedby={fieldErrors.systolicBp ? "systolicBp-error" : undefined} value={form.systolicBp} onChange={e => update("systolicBp", e.target.value)} />{fieldErrors.systolicBp && <small className="field-error-message" id="systolicBp-error">{fieldErrors.systolicBp}</small>}</label>
+        <label className={fieldErrors.diastolicBp ? "field-invalid" : ""}>Diastolic BP (mmHg)<input name="diastolicBp" type="number" required min="1" aria-invalid={Boolean(fieldErrors.diastolicBp)} aria-describedby={fieldErrors.diastolicBp ? "diastolicBp-error" : undefined} value={form.diastolicBp} onChange={e => update("diastolicBp", e.target.value)} />{fieldErrors.diastolicBp && <small className="field-error-message" id="diastolicBp-error">{fieldErrors.diastolicBp}</small>}</label>
+        <label className={fieldErrors.heartRate ? "field-invalid" : ""}>Heart rate (bpm)<input name="heartRate" type="number" required min="1" max="300" aria-invalid={Boolean(fieldErrors.heartRate)} aria-describedby={fieldErrors.heartRate ? "heartRate-error" : undefined} value={form.heartRate} onChange={e => update("heartRate", e.target.value)} />{fieldErrors.heartRate && <small className="field-error-message" id="heartRate-error">{fieldErrors.heartRate}</small>}</label>
+        <label className={fieldErrors.respiratoryRate ? "field-invalid" : ""}>Respiratory rate (/min)<input name="respiratoryRate" type="number" required min="1" max="100" aria-invalid={Boolean(fieldErrors.respiratoryRate)} aria-describedby={fieldErrors.respiratoryRate ? "respiratoryRate-error" : undefined} value={form.respiratoryRate} onChange={e => update("respiratoryRate", e.target.value)} />{fieldErrors.respiratoryRate && <small className="field-error-message" id="respiratoryRate-error">{fieldErrors.respiratoryRate}</small>}</label>
+        <label className={fieldErrors.temperatureC ? "field-invalid" : ""}>Temperature (°C)<input name="temperatureC" type="number" required min="25" max="45" step="0.1" aria-invalid={Boolean(fieldErrors.temperatureC)} aria-describedby={fieldErrors.temperatureC ? "temperatureC-error" : undefined} value={form.temperatureC} onChange={e => update("temperatureC", e.target.value)} />{fieldErrors.temperatureC && <small className="field-error-message" id="temperatureC-error">{fieldErrors.temperatureC}</small>}</label>
+        <label className={fieldErrors.spo2Percent ? "field-invalid" : ""}>SpO₂ (%)<input name="spo2Percent" type="number" required min="0" max="100" aria-invalid={Boolean(fieldErrors.spo2Percent)} aria-describedby={fieldErrors.spo2Percent ? "spo2Percent-error" : undefined} value={form.spo2Percent} onChange={e => update("spo2Percent", e.target.value)} />{fieldErrors.spo2Percent && <small className="field-error-message" id="spo2Percent-error">{fieldErrors.spo2Percent}</small>}</label>
+        <label className={"span-two" + (fieldErrors.symptoms ? " field-invalid" : "")}>Symptoms<textarea name="symptoms" rows="3" required aria-invalid={Boolean(fieldErrors.symptoms)} aria-describedby={fieldErrors.symptoms ? "symptoms-error" : undefined} value={form.symptoms} onChange={e => update("symptoms", e.target.value)} />{fieldErrors.symptoms && <small className="field-error-message" id="symptoms-error">{fieldErrors.symptoms}</small>}</label>
+        <label className={"span-two" + (fieldErrors.notes ? " field-invalid" : "")}>Clinical notes<textarea name="notes" rows="3" required aria-invalid={Boolean(fieldErrors.notes)} aria-describedby={fieldErrors.notes ? "notes-error" : undefined} value={form.notes} onChange={e => update("notes", e.target.value)} />{fieldErrors.notes && <small className="field-error-message" id="notes-error">{fieldErrors.notes}</small>}</label>
         <button className="button button-primary span-two" disabled={busy}>{busy ? "Submitting observations…" : "Submit for risk assessment"}</button>
       </form>
     </section>}

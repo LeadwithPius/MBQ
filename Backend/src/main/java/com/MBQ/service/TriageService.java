@@ -265,6 +265,42 @@ public class TriageService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "patientId is required");
         }
+        if (request.queueTicketId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "queueTicketId is required");
+        }
+        if (request.systolicBp() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "systolicBp is required");
+        }
+        if (request.diastolicBp() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "diastolicBp is required");
+        }
+        if (request.heartRate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "heartRate is required");
+        }
+        if (request.temperatureC() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "temperatureC is required");
+        }
+        if (request.respiratoryRate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "respiratoryRate is required");
+        }
+        if (request.spo2Percent() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "spo2Percent is required");
+        }
+        if (request.symptoms() == null || request.symptoms().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "symptoms is required");
+        }
+        if (request.notes() == null || request.notes().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "notes is required");
+        }
 
         if (request.systolicBp() != null
                 && (request.systolicBp() < 30 || request.systolicBp() > 300)) {
