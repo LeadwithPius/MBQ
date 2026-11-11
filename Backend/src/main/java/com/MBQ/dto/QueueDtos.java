@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public final class QueueDtos {
 
@@ -99,7 +100,7 @@ public final class QueueDtos {
             String departmentName,
             PriorityLevel priorityLevel,
             TicketStatus status,
-            LocalDateTime timeIssued,
+            OffsetDateTime timeIssued,
             boolean requiresBlood,
             String triageNotes,
             String outcome
