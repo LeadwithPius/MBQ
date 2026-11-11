@@ -61,8 +61,14 @@ export async function api(path, options = {}) {
   if (!response.ok) {
     const message = typeof payload === "string"
       ? payload
-      : payload?.detail || payload?.message || payload?.error || "Request failed (" + response.status + ")";
-    throw new Error(message);
+      : payload?.detail || payload?.message || payload?.formError || payload?.error || "Request failed (" + response.status + ")";
+    const error = new Error(message);
+    if (payload && typeof payload === "object") {
+      error.fieldErrors = payload.fieldErrors || {};
+      error.formError = payload.formError || "";
+      error.status = response.status;
+    }
+    throw error;
   }
   return payload;
 }
