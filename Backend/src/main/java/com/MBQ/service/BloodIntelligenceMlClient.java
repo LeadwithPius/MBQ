@@ -1,11 +1,15 @@
 package com.MBQ.service;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -21,11 +25,21 @@ public class BloodIntelligenceMlClient {
     private final RestClient client;
     private final String apiKey;
 
-    public BloodIntelligenceMlClient(RestClient.Builder builder,
+    public BloodIntelligenceMlClient(
             @Value("${app.blood-intelligence.ml-url:}") String baseUrl,
             @Value("${app.blood-intelligence.ml-api-key:}") String apiKey) {
-        this.client = baseUrl == null || baseUrl.isBlank() ? null
-                : builder.baseUrl(baseUrl.replaceAll("/+$", "")).build();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            this.client = null;
+        } else {
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(3)).build();
+            JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+            requestFactory.setReadTimeout(Duration.ofSeconds(20));
+            this.client = RestClient.builder()
+                    .baseUrl(baseUrl.replaceAll("/+$", ""))
+                    .requestFactory(requestFactory)
+                    .build();
+        }
         this.apiKey = apiKey == null ? "" : apiKey;
     }
 
@@ -35,7 +49,7 @@ public class BloodIntelligenceMlClient {
         }
         try {
             RestClient.RequestBodySpec request = client.post().uri("/forecast")
-                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    .contentType(MediaType.APPLICATION_JSON);
             if (!apiKey.isBlank()) {
                 request.header("X-API-Key", apiKey);
             }
