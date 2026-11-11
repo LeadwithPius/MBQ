@@ -252,8 +252,6 @@ function useQueueActions(refresh) {
         if (!called?.patientId || !called?.id) {
           throw new Error("The queue returned an incomplete patient record. Refresh the queue and try again.");
         }
-        setMessage((called.patientName || "The next patient") + " has been called. Opening triage…");
-        await refresh();
         navigate("/app/triage?patientId=" + called.patientId + "&ticketId=" + called.id);
       } catch (err) {
         setMessage(err.message);
