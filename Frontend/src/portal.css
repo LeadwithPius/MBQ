@@ -1379,3 +1379,124 @@
     font-size: 14px;
   }
 }
+
+
+/* ==========================================================
+   MBQ TYPOGRAPHY SYSTEM
+   ChatGPT-inspired: calm, readable, consistent and responsive.
+   ========================================================== */
+:root {
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-body: #344054;
+  --text-secondary: #667085;
+}
+html { font-size: 16px; }
+body, button, input, select, textarea {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+body { color: var(--ink, #172b43); }
+button, input, select, textarea { letter-spacing: normal; }
+
+/* Workspace: keep operational information comfortably readable. */
+.workspace-content { font-size: var(--text-base); line-height: 1.55; }
+.workspace-content :where(p, li, dt, dd, label, a, button, input, select, textarea, td) {
+  font-size: var(--text-sm) !important;
+  line-height: 1.5;
+}
+.workspace-content :where(small, .eyebrow, .live-label, .topbar-overline) {
+  font-size: var(--text-xs) !important;
+  line-height: 1.45;
+}
+.workspace-content :where(h1, h2, h3, h4) {
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.workspace-content .page-title-row h1 { font-size: var(--text-3xl) !important; }
+.workspace-content .panel-heading h2,
+.workspace-content .panel > h2,
+.workspace-content .assessment-panel h2 { font-size: var(--text-xl) !important; }
+.workspace-content :where(.panel h3, .blood-form h3, .consultation-section-title) {
+  font-size: var(--text-lg) !important;
+}
+.workspace-content .page-title-row p,
+.workspace-content .panel-heading p,
+.workspace-content .empty-panel,
+.workspace-content .notice,
+.workspace-content .report-meta { font-size: var(--text-sm) !important; }
+.workspace-content .data-table th {
+  font-size: var(--text-xs) !important;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.workspace-content .data-table td { font-size: var(--text-sm) !important; }
+.workspace-content .data-table td b { font-size: inherit; }
+.workspace-content .pill,
+.workspace-content .priority-badge,
+.workspace-content .queue-status,
+.workspace-content .topbar-role {
+  font-size: var(--text-xs) !important;
+  line-height: 1.35;
+}
+.workspace-content .stat-card small { font-size: var(--text-xs) !important; }
+.workspace-content .stat-card strong { font-size: 1.625rem !important; line-height: 1.2; }
+.workspace-content .form-grid label,
+.workspace-content .lookup-form label,
+.workspace-content .review-controls label,
+.workspace-content .threshold-form label,
+.workspace-content .report-date,
+.workspace-content .donor-filter { font-size: var(--text-sm) !important; }
+.workspace-content .form-grid :where(input, select, textarea),
+.workspace-content .lookup-form :where(input, select, textarea),
+.workspace-content .review-controls :where(input, select, textarea),
+.workspace-content .threshold-form input,
+.workspace-content .report-date input,
+.workspace-content .table-input {
+  font-size: var(--text-sm) !important;
+  line-height: 1.45;
+}
+.workspace-content :where(.button, .table-action, .review-buttons .button) {
+  font-size: var(--text-sm) !important;
+  line-height: 1.35;
+}
+.workspace-content .workspace-nav-link { font-size: var(--text-sm); }
+.workspace-sidebar :where(.sidebar-caption, .sidebar-help p, .staff-profile small) {
+  font-size: var(--text-xs);
+}
+.workspace-sidebar .workspace-nav-link { font-size: var(--text-sm); }
+.workspace-topbar :where(.topbar-overline, .topbar-user, .topbar-role) { font-size: var(--text-xs); }
+.workspace-topbar b { font-size: var(--text-sm); }
+
+/* Login and public pages use the same body scale and control sizing. */
+.login-page, .public-page { font-size: var(--text-base); line-height: 1.55; }
+.login-card h1 { font-size: var(--text-3xl); line-height: 1.2; }
+.login-card :where(label, input, .login-subtitle, .form-error) { font-size: var(--text-sm); }
+.login-card .login-security { font-size: var(--text-xs); }
+.public-nav nav, .public-page .text-link { font-size: var(--text-sm); }
+.public-page .hero-copy > p,
+.public-page .section-intro p,
+.public-page .feature-card p,
+.public-page .workflow-steps p,
+.public-page .public-cta p { font-size: var(--text-base); line-height: 1.65; }
+.public-page .feature-card h3,
+.public-page .workflow-steps h3 { font-size: var(--text-lg); }
+.public-page .hero-trust,
+.public-page .public-footer > span { font-size: var(--text-sm); }
+
+/* Preserve dense data layouts on narrow screens without shrinking the type. */
+@media (max-width: 560px) {
+  .workspace-content { font-size: var(--text-base); }
+  .workspace-content .page-title-row h1 { font-size: var(--text-2xl) !important; }
+  .workspace-content .stat-card strong { font-size: 1.375rem !important; }
+  .workspace-content .data-table th { font-size: 0.75rem !important; }
+  .workspace-content .data-table td { font-size: 0.8125rem !important; }
+  .workspace-content :where(button, input, select, textarea) { min-height: 40px; }
+}
