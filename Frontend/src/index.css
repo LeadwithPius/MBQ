@@ -105,3 +105,191 @@ button:disabled {
   min-width: 150px;
   max-width: 220px;
 }
+
+
+/* Single-facility predictive blood intelligence report */
+.blood-intelligence-report {
+  display: grid;
+  gap: 18px;
+}
+.blood-intelligence-report .panel-heading {
+  align-items: flex-start;
+}
+.intelligence-kpis .stat-card strong {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.intelligence-report-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  min-width: 0;
+}
+.intelligence-report-section h3 {
+  margin: 0 0 8px;
+  color: var(--navy);
+  font-family: "Manrope", sans-serif;
+  font-size: 1rem;
+}
+.intelligence-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.intelligence-metric-grid > div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+.intelligence-metric-grid small {
+  color: var(--muted);
+  font-size: .75rem;
+}
+.intelligence-metric-grid b {
+  color: var(--navy);
+  font-size: .95rem;
+}
+.intelligence-forecast-table {
+  min-width: 1120px;
+}
+.intelligence-group-select {
+  display: grid;
+  gap: 5px;
+  min-width: 130px;
+  color: var(--muted);
+  font-size: .78rem;
+}
+.intelligence-group-select select {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--navy);
+}
+.intelligence-chart-wrap {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+.intelligence-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--muted);
+  font-size: .78rem;
+  margin-bottom: 8px;
+}
+.intelligence-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.intelligence-chart-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 3px;
+  border-radius: 3px;
+}
+.legend-history { background: #3267e9; }
+.legend-forecast { background: #168c86; }
+.intelligence-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.intelligence-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .78rem;
+}
+.intelligence-chart-summary b {
+  display: block;
+  margin-top: 3px;
+  color: var(--navy);
+  font-size: .9rem;
+}
+.intelligence-recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.intelligence-recommendation:last-of-type {
+  border-bottom: 0;
+}
+.intelligence-recommendation > div {
+  min-width: 0;
+}
+.intelligence-recommendation p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.intelligence-feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 24px;
+  margin: 10px 0;
+  padding-left: 20px;
+  color: #475467;
+  font-size: .82rem;
+}
+.intelligence-report-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 760px) {
+  .intelligence-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .intelligence-feature-list {
+    grid-template-columns: 1fr;
+  }
+  .blood-intelligence-report .panel-heading {
+    flex-direction: column;
+  }
+}
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body * { visibility: hidden !important; }
+  .blood-intelligence-report,
+  .blood-intelligence-report * { visibility: visible !important; }
+  .blood-intelligence-report {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .blood-intelligence-report .report-actions,
+  .blood-intelligence-report button,
+  .blood-intelligence-report select {
+    display: none !important;
+  }
+  .blood-intelligence-report .table-wrap {
+    overflow: visible !important;
+  }
+  .blood-intelligence-report .intelligence-forecast-table {
+    min-width: 0 !important;
+    font-size: 7pt !important;
+  }
+  .blood-intelligence-report .intelligence-report-section,
+  .blood-intelligence-report .intelligence-chart-wrap,
+  .blood-intelligence-report .intelligence-metric-grid {
+    break-inside: avoid;
+  }
+}

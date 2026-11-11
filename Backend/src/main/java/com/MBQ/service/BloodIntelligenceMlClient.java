@@ -34,7 +34,7 @@ public class BloodIntelligenceMlClient {
             HttpClient httpClient = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(3)).build();
             JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-            requestFactory.setReadTimeout(Duration.ofSeconds(20));
+            requestFactory.setReadTimeout(Duration.ofSeconds(30));
             this.client = RestClient.builder()
                     .baseUrl(baseUrl.replaceAll("/+$", ""))
                     .requestFactory(requestFactory)
@@ -70,11 +70,59 @@ public class BloodIntelligenceMlClient {
     public record SeriesInput(Long stockId, Long facilityId, String bloodGroup,
             List<DailyDemand> dailyDemand) {}
     public record DailyDemand(LocalDate date, int unitsIssued) {}
-    public record MlResponse(String status, String modelVersion, Double validationMae,
-            Double baselineMae, String message, List<StockForecast> forecasts,
-            Boolean synthetic, String dataSource, Integer seriesCount,
-            Integer facilityCount, Integer bloodGroups, Integer historyDays,
-            String notice) {}
+
+    public record MlResponse(
+            String status,
+            String modelVersion,
+            Double validationMae,
+            Double baselineMae,
+            Double improvementPercent,
+            Integer trainingRows,
+            Integer validationRows,
+            String trainingStart,
+            String trainingEnd,
+            String validationStart,
+            String validationEnd,
+            Integer holdoutDays,
+            String selectedForecastMethod,
+            String facilityName,
+            Long facilityId,
+            Integer seriesCount,
+            Integer facilityCount,
+            Integer bloodGroups,
+            Integer historyDays,
+            String dataSource,
+            Boolean synthetic,
+            String message,
+            String notice,
+            String reportType,
+            List<String> featureSummary,
+            List<StockForecast> forecasts,
+            List<FacilityGroupForecast> facilityForecasts
+    ) {}
+
     public record StockForecast(Long stockId, int predictedDemand7Days,
             int predictedDemand14Days) {}
+
+    public record DailyPoint(LocalDate date, double units) {}
+
+    public record FacilityGroupForecast(
+            String bloodGroup,
+            int currentStockUnits,
+            double averageDailyDemand,
+            double recent7DayAverage,
+            int predictedDemand7Days,
+            int predictedDemand14Days,
+            int predictedDemand30Days,
+            int projectedStock7Days,
+            int projectedStock14Days,
+            int projectedStock30Days,
+            LocalDate estimatedStockoutDate,
+            Integer daysUntilStockout,
+            String riskLevel,
+            int recommendedReplenishmentUnits,
+            List<DailyPoint> historicalDemand,
+            List<DailyPoint> forecastDemand,
+            String explanation
+    ) {}
 }

@@ -120,13 +120,25 @@ public class BloodIntelligenceService {
                     stock.getFacility().getId(), stock.getBloodGroup().name(), dailyDemand));
         }
 
-        BloodIntelligenceMlClient.MlResponse mlResponse = mlClient == null
-                ? null : mlClient.forecast(mlSeries);
+        // Train/evaluate independently per facility. An admin can see several
+        // facilities, but their consumption histories must never be pooled into
+        // one model because each facility has its own demand profile.
+        Map<Long, List<BloodIntelligenceMlClient.SeriesInput>> seriesByFacility = new HashMap<>();
+        for (BloodIntelligenceMlClient.SeriesInput input : mlSeries) {
+            seriesByFacility.computeIfAbsent(input.facilityId(), ignored -> new ArrayList<>()).add(input);
+        }
         Map<Long, BloodIntelligenceMlClient.StockForecast> mlForecasts = new HashMap<>();
-        if (mlResponse != null && "TRAINED".equalsIgnoreCase(mlResponse.status())
-                && mlResponse.forecasts() != null) {
-            for (BloodIntelligenceMlClient.StockForecast prediction : mlResponse.forecasts()) {
-                mlForecasts.put(prediction.stockId(), prediction);
+        Map<Long, BloodIntelligenceMlClient.MlResponse> mlResponsesByStock = new HashMap<>();
+        if (mlClient != null) {
+            for (List<BloodIntelligenceMlClient.SeriesInput> facilitySeries : seriesByFacility.values()) {
+                BloodIntelligenceMlClient.MlResponse response = mlClient.forecast(facilitySeries);
+                if (response != null && "TRAINED".equalsIgnoreCase(response.status())
+                        && response.forecasts() != null) {
+                    for (BloodIntelligenceMlClient.StockForecast prediction : response.forecasts()) {
+                        mlForecasts.put(prediction.stockId(), prediction);
+                        mlResponsesByStock.put(prediction.stockId(), response);
+                    }
+                }
             }
         }
 
@@ -134,6 +146,7 @@ public class BloodIntelligenceService {
         for (ForecastDraft draft : drafts) {
             BloodStock stock = draft.stock();
             BloodIntelligenceMlClient.StockForecast ml = mlForecasts.get(stock.getId());
+            BloodIntelligenceMlClient.MlResponse mlResponse = mlResponsesByStock.get(stock.getId());
             boolean xgboostAvailable = ml != null;
             boolean forecastAvailable = draft.baselineAvailable() || xgboostAvailable;
 
