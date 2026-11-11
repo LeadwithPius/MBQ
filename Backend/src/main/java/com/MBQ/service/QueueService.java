@@ -2,6 +2,7 @@ package com.MBQ.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -149,7 +150,7 @@ public class QueueService {
                         ? PriorityLevel.NORMAL
                         : request.priorityLevel());
         ticket.setStatus(TicketStatus.WAITING);
-        ticket.setTimeIssued(LocalDateTime.now());
+        ticket.setTimeIssued(LocalDateTime.now(ZoneOffset.UTC));
         ticket.setTriageNotes(trimToNull(request.triageNotes()));
         ticket.setRequiresBlood(request.requiresBlood());
 
@@ -374,7 +375,7 @@ public class QueueService {
                 ticket.getDepartment().getName(),
                 ticket.getPriorityLevel(),
                 ticket.getStatus(),
-                ticket.getTimeIssued(),
+                ticket.getTimeIssued() == null ? null : ticket.getTimeIssued().atOffset(ZoneOffset.UTC),
                 ticket.isRequiresBlood(),
                 ticket.getTriageNotes(),
                 ticket.getOutcome());
