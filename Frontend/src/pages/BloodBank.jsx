@@ -6,7 +6,7 @@ import { useAuth } from "../context/useAuth";
 // Who may do what (mirrors the backend @PreAuthorize rules).
 const MANAGE_ROLES = ["ADMIN", "LAB_STAFF"];            // receive stock, donors, alerts, thresholds
 const ISSUE_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];   // issue units
-const LEDGER_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR", "NURSE"];  // movement history
+const LEDGER_ROLES = ["ADMIN", "LAB_STAFF", "DOCTOR"];  // movement history
 const REQUEST_ROLES = ["DOCTOR", "NURSE"];
 const REVIEW_REQUEST_ROLES = ["ADMIN", "LAB_STAFF"];
 
@@ -268,7 +268,7 @@ function BloodRequestsPanel({ requests, patients, stock, canRequest, canReview, 
         headers: { "Idempotency-Key": idempotencyKey() },
         body: { stockId },
       }),
-      result => "Request #" + request.id + " fulfilled. " + result.units + " unit(s) issued from " +
+      result => "Request #" + request.id + " fulfilled. " + result.unitsChanged + " unit(s) issued from "
         (selectedStock ? groupLabel(selectedStock.bloodGroup) : "selected stock") + "."
     );
   };
