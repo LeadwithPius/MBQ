@@ -39,6 +39,8 @@ export function BloodBankPage() {
 
   const [stock, setStock] = useState([]);
   const [forecasts, setForecasts] = useState([]);
+  const [demoResult, setDemoResult] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [requests, setRequests] = useState([]);
   const [donors, setDonors] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -79,6 +81,19 @@ export function BloodBankPage() {
     return () => { active = false; };
   }, [load]);
 
+  async function runSyntheticDemo() {
+    setDemoLoading(true);
+    setError("");
+    try {
+      const result = await api("/blood-intelligence/demo-forecast");
+      setDemoResult(result);
+    } catch (err) {
+      setError("Synthetic demo could not run: " + err.message);
+    } finally {
+      setDemoLoading(false);
+    }
+  }
+
   const selected = stock.find(item => item.stockId === selectedId) || null;
   const lowStock = stock.filter(item => item.low);
 
@@ -108,7 +123,7 @@ export function BloodBankPage() {
   return <>
     <div className="page-title-row">
       <div><span className="eyebrow">BLOOD BANK</span><h1>Blood bank</h1><p>Stock by blood group, expiry-aware batches, low-stock alerts and donor notifications.</p></div>
-      <button className="button button-outline" onClick={load} disabled={loading || busy}><RefreshCw size={16} /> Refresh</button>
+      <div className="button-row"><button className="button button-outline" onClick={runSyntheticDemo} disabled={demoLoading}><Activity size={16} /> {demoLoading ? "Running demo…" : "Run synthetic ML demo"}</button><button className="button button-outline" onClick={load} disabled={loading || busy}><RefreshCw size={16} /> Refresh</button></div>
     </div>
 
     {error && <div className="notice notice-warning">{error}</div>}
@@ -122,6 +137,24 @@ export function BloodBankPage() {
         </tbody></table></div>}
       <p className="report-note">XGBoost uses up to 365 days of daily issue history and is shown only when it beats the moving-average baseline on a chronological holdout. Otherwise, the dashboard uses the transparent 28-day moving-average fallback. The ledger reflects fulfilled issues, not unmet requests. Forecasts are planning support, not clinical decisions.</p>
     </section>
+
+    {demoResult && <section className="panel">
+      <div className="panel-heading"><div><h2>Synthetic XGBoost demonstration</h2><p>Generated sample data · separate from live inventory and patient records</p></div><span className="pill priority-urgent">DEMO DATA</span></div>
+      <div className="notice notice-warning" role="note">{demoResult.notice || "Synthetic data only. Not actual hospital demand."}</div>
+      <div className="stats-grid">
+        <div className="stat-card"><span>Generated series</span><strong>{demoResult.seriesCount ?? "—"}</strong></div>
+        <div className="stat-card"><span>Facilities simulated</span><strong>{demoResult.facilityCount ?? "—"}</strong></div>
+        <div className="stat-card"><span>History</span><strong>{demoResult.historyDays ?? "—"} days</strong></div>
+        <div className="stat-card"><span>Model result</span><strong>{demoResult.status || "Unavailable"}</strong></div>
+      </div>
+      <p className="report-note">{demoResult.message || "No model message returned."} {demoResult.validationMae != null && <>XGBoost holdout MAE: <b>{Number(demoResult.validationMae).toFixed(2)}</b>. </>}{demoResult.baselineMae != null && <>Baseline MAE: <b>{Number(demoResult.baselineMae).toFixed(2)}</b>.</>}</p>
+      {Array.isArray(demoResult.forecasts) && demoResult.forecasts.length > 0
+        ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Demo stock ID</th><th>7-day demand</th><th>14-day demand</th><th>Method</th></tr></thead><tbody>
+          {demoResult.forecasts.slice(0, 12).map(row => <tr key={row.stockId}><td>{row.stockId}</td><td>{row.predictedDemand7Days}</td><td>{row.predictedDemand14Days}</td><td>{demoResult.status === "TRAINED" ? "XGBoost" : "Baseline comparison"}</td></tr>)}
+        </tbody></table></div>
+        : <div className="empty-panel">The generated dataset ran, but XGBoost did not pass the validation gate. The result is still useful for demonstrating why a baseline comparison matters.</div>}
+      <p className="report-note">This demo is reproducible and does not create blood-stock movements, batches, donors, patient records or Neon database rows.</p>
+    </section>}
 
     {lowStock.map(item => <div className="blood-low-alert" key={item.stockId} role="alert">
       <AlertTriangle size={18} />
