@@ -13,6 +13,16 @@ const REVIEW_REQUEST_ROLES = ["ADMIN", "LAB_STAFF"];
 const GROUPS = ["A_POS", "A_NEG", "B_POS", "B_NEG", "AB_POS", "AB_NEG", "O_POS", "O_NEG"];
 const OUTFLOW = ["ISSUED", "EXPIRED", "WASTED", "TRANSFER_OUT", "ADJUSTMENT_OUT"];
 const groupLabel = group => (group || "").replace("_POS", "+").replace("_NEG", "−");
+const COMPATIBLE_STOCK = {
+  O_NEG: ["O_NEG"],
+  O_POS: ["O_POS", "O_NEG"],
+  A_NEG: ["A_NEG", "O_NEG"],
+  A_POS: ["A_POS", "A_NEG", "O_POS", "O_NEG"],
+  B_NEG: ["B_NEG", "O_NEG"],
+  B_POS: ["B_POS", "B_NEG", "O_POS", "O_NEG"],
+  AB_NEG: ["AB_NEG", "A_NEG", "B_NEG", "O_NEG"],
+  AB_POS: GROUPS,
+};
 
 function idempotencyKey() {
   // A new key per submit, so a double-click or network retry can't receive/issue twice.
@@ -313,7 +323,7 @@ function BloodRequestsPanel({ requests, patients, stock, canRequest, canReview, 
         </div> : request.status === "APPROVED" ? <div className="blood-request-actions">
           <select aria-label={"Stock for request " + request.id} value={stockChoices[request.id] || ""} onChange={e => setStockChoices(current => ({ ...current, [request.id]: e.target.value }))}>
             <option value="">Select compatible stock</option>
-            {stock.filter(item => item.issuableUnits > 0).map(item => <option key={item.stockId} value={item.stockId}>{groupLabel(item.bloodGroup)} · {item.issuableUnits} issuable</option>)}
+            {stock.filter(item => item.issuableUnits > 0 && (COMPATIBLE_STOCK[request.bloodGroup] || ["O_NEG"]).includes(item.bloodGroup)).map(item => <option key={item.stockId} value={item.stockId}>{groupLabel(item.bloodGroup)} · {item.issuableUnits} issuable</option>)}
           </select>
           <button className="table-action" disabled={busy || !stockChoices[request.id]} onClick={() => fulfil(request)}>Fulfil & issue</button>
         </div> : request.status === "FULFILLED" ? <small>Issued from stock #{request.stockId}</small> : "—"}</td>}
