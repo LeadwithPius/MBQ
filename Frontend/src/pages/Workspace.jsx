@@ -186,20 +186,33 @@ function relativeAge(timestamp, now) {
   return "Updated " + minutes + "m ago";
 }
 
-function waitMinutes(timeIssued, now) {
+function queueTimestamp(timeIssued) {
   if (!timeIssued) return null;
-  const parsed = new Date(timeIssued).getTime();
-  if (!Number.isFinite(parsed)) return null;
+  // New API responses include an explicit UTC offset. Treat legacy timezone-free
+  // values as UTC too, rather than letting the browser assume the local timezone.
+  const value = typeof timeIssued === "string"
+    && !/(Z|[+-]\d{2}:?\d{2})$/i.test(timeIssued)
+    ? timeIssued + "Z"
+    : timeIssued;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function waitMinutes(timeIssued, now) {
+  const parsed = queueTimestamp(timeIssued);
+  if (parsed === null) return null;
   return Math.max(0, Math.floor((now - parsed) / 60000));
 }
 
 function orderedQueue(rows, sortBy = "priority") {
   return [...rows].sort((a, b) => {
-    if (sortBy === "wait") return (new Date(a.timeIssued) - new Date(b.timeIssued));
+    const aIssued = queueTimestamp(a.timeIssued) ?? 0;
+    const bIssued = queueTimestamp(b.timeIssued) ?? 0;
+    if (sortBy === "wait") return aIssued - bIssued;
     if (sortBy === "patient") return String(a.patientName || "").localeCompare(String(b.patientName || ""));
     const rank = { EMERGENCY: 0, URGENT: 1, NORMAL: 2 };
     return (rank[a.priorityLevel] ?? 3) - (rank[b.priorityLevel] ?? 3)
-      || (new Date(a.timeIssued) - new Date(b.timeIssued));
+      || aIssued - bIssued;
   });
 }
 
