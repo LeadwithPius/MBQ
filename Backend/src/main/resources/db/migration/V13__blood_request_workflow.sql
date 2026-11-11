@@ -26,7 +26,7 @@ CREATE TABLE blood_request (
     ),
     CONSTRAINT chk_blood_request_fulfilment CHECK (
       (status = 'FULFILLED' AND fulfilled_at IS NOT NULL AND stock_id IS NOT NULL AND inventory_operation_id IS NOT NULL)
-      OR (status <> 'FULFILLED' AND fulfilled_at IS NULL AND inventory_operation_id IS NULL)
+      OR (status <> 'FULFILLED' AND fulfilled_at IS NULL AND stock_id IS NULL AND inventory_operation_id IS NULL)
     )
 );
 
