@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, HeartHandshake, Trash2, PackagePlus, RefreshCw, Send, UserPlus, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, CheckCircle2, Droplet, HeartHandshake, Trash2, PackagePlus, RefreshCw, Send, UserPlus, XCircle, Printer, TrendingUp } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/useAuth";
 
@@ -55,6 +55,7 @@ export function BloodBankPage() {
   const [forecasts, setForecasts] = useState([]);
   const [demoResult, setDemoResult] = useState(null);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [demoGroup, setDemoGroup] = useState("O_POS");
   const [requests, setRequests] = useState([]); // triage flags on active queue tickets
   const [bloodRequests, setBloodRequests] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -173,22 +174,84 @@ export function BloodBankPage() {
       <p className="report-note">XGBoost uses up to 365 days of daily issue history and is shown only when it beats the moving-average baseline on a chronological holdout. Otherwise, the dashboard uses the transparent 28-day moving-average fallback. The ledger reflects fulfilled issues, not unmet requests. Forecasts are planning support, not clinical decisions.</p>
     </section>
 
-    {demoResult && <section className="panel">
-      <div className="panel-heading"><div><h2>Synthetic XGBoost demonstration</h2><p>Generated sample data · separate from live inventory and patient records</p></div><span className="pill priority-urgent">DEMO DATA</span></div>
-      <div className="notice notice-warning" role="note">{demoResult.notice || "Synthetic data only. Not actual hospital demand."}</div>
-      <div className="stats-grid">
-        <div className="stat-card"><span>Generated series</span><strong>{demoResult.seriesCount ?? "—"}</strong></div>
-        <div className="stat-card"><span>Facilities simulated</span><strong>{demoResult.facilityCount ?? "—"}</strong></div>
-        <div className="stat-card"><span>History</span><strong>{demoResult.historyDays ?? "—"} days</strong></div>
-        <div className="stat-card"><span>Model result</span><strong>{demoResult.status || "Unavailable"}</strong></div>
+    {demoResult && <section className="panel blood-intelligence-report">
+      <div className="panel-heading report-actions">
+        <div><h2>Facility predictive management report</h2><p>{demoResult.facilityName || "Demonstration facility"} · 365-day synthetic consumption history · 30-day outlook</p></div>
+        <div className="button-row">
+          <span className="pill priority-urgent">SYNTHETIC POC</span>
+          <button className="button button-primary" onClick={() => window.print()}><Printer size={15} /> Print / Save PDF</button>
+        </div>
       </div>
-      <p className="report-note">{demoResult.message || "No model message returned."} {demoResult.validationMae != null && <>XGBoost holdout MAE: <b>{Number(demoResult.validationMae).toFixed(2)}</b>. </>}{demoResult.baselineMae != null && <>Baseline MAE: <b>{Number(demoResult.baselineMae).toFixed(2)}</b>.</>}</p>
-      {Array.isArray(demoResult.forecasts) && demoResult.forecasts.length > 0
-        ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Demo stock ID</th><th>7-day demand</th><th>14-day demand</th><th>Method</th></tr></thead><tbody>
-          {demoResult.forecasts.slice(0, 12).map(row => <tr key={row.stockId}><td>{row.stockId}</td><td>{row.predictedDemand7Days}</td><td>{row.predictedDemand14Days}</td><td>{demoResult.status === "TRAINED" ? "XGBoost" : "Baseline comparison"}</td></tr>)}
-        </tbody></table></div>
-        : <div className="empty-panel">The generated dataset ran, but XGBoost did not pass the validation gate. The result is still useful for demonstrating why a baseline comparison matters.</div>}
-      <p className="report-note">This demo is reproducible and does not create blood-stock movements, batches, donors, patient records or Neon database rows.</p>
+      <div className="notice notice-warning" role="note">{demoResult.notice || "Synthetic demonstration data only. Not actual hospital demand."}</div>
+
+      <div className="stats-grid intelligence-kpis">
+        <div className="stat-card"><span>Facility</span><strong>{demoResult.facilityName || "—"}</strong></div>
+        <div className="stat-card"><span>Blood groups analysed</span><strong>{demoResult.bloodGroups ?? demoResult.facilityForecasts?.length ?? "—"}</strong></div>
+        <div className="stat-card"><span>History used</span><strong>{demoResult.historyDays ?? "—"} days</strong></div>
+        <div className="stat-card"><span>Predicted shortage risks</span><strong>{(demoResult.facilityForecasts || []).filter(row => row.riskLevel !== "LOW").length}</strong></div>
+      </div>
+
+      <section className="intelligence-report-section">
+        <div className="panel-heading"><div><h3>Model training and validation</h3><p>Chronological holdout: the model is evaluated on later observations it did not train on.</p></div><TrendingUp size={19} /></div>
+        <div className="intelligence-metric-grid">
+          <div><small>Selected forecast method</small><b>{demoResult.selectedForecastMethod || "—"}</b></div>
+          <div><small>XGBoost holdout MAE</small><b>{demoResult.validationMae == null ? "—" : Number(demoResult.validationMae).toFixed(2) + " units/day"}</b></div>
+          <div><small>28-day baseline MAE</small><b>{demoResult.baselineMae == null ? "—" : Number(demoResult.baselineMae).toFixed(2) + " units/day"}</b></div>
+          <div><small>Improvement over baseline</small><b>{demoResult.improvementPercent == null ? "—" : Number(demoResult.improvementPercent).toFixed(1) + "%"}</b></div>
+          <div><small>Training observations</small><b>{demoResult.trainingRows ?? "—"}</b></div>
+          <div><small>Validation observations</small><b>{demoResult.validationRows ?? "—"}</b></div>
+        </div>
+        <p className="report-note">{demoResult.message || "No model evaluation message returned."} Training window: {demoResult.trainingStart || "—"} to {demoResult.trainingEnd || "—"}. Holdout: {demoResult.validationStart || "—"} to {demoResult.validationEnd || "—"} ({demoResult.holdoutDays ?? "—"} days).</p>
+      </section>
+
+      <section className="intelligence-report-section">
+        <div className="panel-heading"><div><h3>Blood-group demand and shortage outlook</h3><p>Forecasts use this facility's synthetic consumption profile only.</p></div></div>
+        {(demoResult.facilityForecasts || []).length === 0
+          ? <div className="empty-panel">The model did not return facility-level forecasts. Review the model status and available history.</div>
+          : <div className="table-wrap"><table className="data-table intelligence-forecast-table"><thead><tr>
+            <th>Group</th><th>Stock now</th><th>Demand 7d</th><th>Demand 14d</th><th>Demand 30d</th>
+            <th>Stock after 7d</th><th>Stock after 14d</th><th>Stock after 30d</th><th>Estimated stock-out</th><th>Risk</th><th>Replenish</th>
+          </tr></thead><tbody>
+            {demoResult.facilityForecasts.map(row => <tr key={row.bloodGroup}>
+              <td><b>{groupLabel(row.bloodGroup)}</b></td>
+              <td>{row.currentStockUnits}</td><td>{row.predictedDemand7Days}</td><td>{row.predictedDemand14Days}</td><td>{row.predictedDemand30Days}</td>
+              <td>{row.projectedStock7Days}</td><td>{row.projectedStock14Days}</td><td>{row.projectedStock30Days}</td>
+              <td>{row.estimatedStockoutDate ? new Date(row.estimatedStockoutDate + "T00:00:00").toLocaleDateString() : "Beyond 30 days"}</td>
+              <td><span className={"pill " + (row.riskLevel === "CRITICAL" ? "priority-emergency" : row.riskLevel === "HIGH" || row.riskLevel === "MODERATE" ? "priority-urgent" : "priority-normal")}>{row.riskLevel}</span></td>
+              <td><b>{row.recommendedReplenishmentUnits}</b> units</td>
+            </tr>)}
+          </tbody></table></div>}
+      </section>
+
+      {(demoResult.facilityForecasts || []).length > 0 && <section className="intelligence-report-section">
+        <div className="panel-heading"><div><h3>Historical consumption vs forecast</h3><p>Choose a blood group to inspect its recent usage and next 30 days.</p></div>
+          <label className="intelligence-group-select">Blood group<select value={demoGroup} onChange={event => setDemoGroup(event.target.value)}>
+            {demoResult.facilityForecasts.map(row => <option key={row.bloodGroup} value={row.bloodGroup}>{groupLabel(row.bloodGroup)}</option>)}
+          </select></label>
+        </div>
+        <FacilityDemandChart group={demoResult.facilityForecasts.find(row => row.bloodGroup === demoGroup) || demoResult.facilityForecasts[0]} />
+      </section>}
+
+      <section className="intelligence-report-section">
+        <div className="panel-heading"><div><h3>Management recommendations</h3><p>Suggested replenishment is a planning estimate and requires blood-bank review.</p></div></div>
+        {(demoResult.facilityForecasts || []).filter(row => row.recommendedReplenishmentUnits > 0).sort((a, b) => (a.daysUntilStockout ?? 999) - (b.daysUntilStockout ?? 999)).map(row =>
+          <div className="intelligence-recommendation" key={row.bloodGroup}>
+            <span className={"pill " + (row.riskLevel === "CRITICAL" ? "priority-emergency" : row.riskLevel === "LOW" ? "priority-normal" : "priority-urgent")}>{row.riskLevel}</span>
+            <div><b>{groupLabel(row.bloodGroup)} — replenish approximately {row.recommendedReplenishmentUnits} units</b>
+              <p>{row.explanation} {row.estimatedStockoutDate ? "Projected depletion: " + new Date(row.estimatedStockoutDate + "T00:00:00").toLocaleDateString() + "." : "No stock-out is projected within 30 days."}</p>
+            </div>
+          </div>
+        )}
+        <p className="report-note">Recommendations use a 30-day demand target plus a 50% seven-day demand safety buffer, less the illustrative opening stock. They are not automatic purchase orders.</p>
+      </section>
+
+      <section className="intelligence-report-section">
+        <h3>How the model makes its predictions</h3>
+        <p className="report-note">The model learns from one facility's daily consumption history, with each blood group represented as its own demand series. XGBoost receives blood-group identity, day-of-week and annual seasonal signals, lagged usage (1, 2, 7, 14 and 28 days), rolling averages and recent demand variability.</p>
+        <ul className="intelligence-feature-list">{(demoResult.featureSummary || []).map(feature => <li key={feature}>{feature}</li>)}</ul>
+        <p className="report-note">For the proof of concept, the report uses a fictional facility and generated opening stock. Projected stock assumes no future replenishment. The live operational forecast continues to use the authenticated facility's real stock and recorded movements.</p>
+      </section>
+      <p className="report-note intelligence-report-footer">MBQ Blood Intelligence · Generated {new Date().toLocaleString()} · Synthetic proof of concept only · Not a clinical decision or actual facility report.</p>
     </section>}
 
     {lowStock.map(item => <div className="blood-low-alert" key={item.stockId} role="alert">
@@ -234,6 +297,48 @@ export function BloodBankPage() {
 
     {canManage && <DonationsPanel donors={donors} donations={donations} busy={busy} run={run} />}
   </>;
+}
+
+
+function FacilityDemandChart({ group }) {
+  if (!group) return null;
+  const history = (group.historicalDemand || []).slice(-30);
+  const forecast = group.forecastDemand || [];
+  const values = [...history.map(point => point.units), ...forecast.map(point => point.units)];
+  const maxValue = Math.max(1, ...values) * 1.12;
+  const width = 760;
+  const height = 250;
+  const left = 42;
+  const right = 14;
+  const top = 16;
+  const bottom = 34;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const x = index => left + (values.length <= 1 ? 0 : index / (values.length - 1)) * plotWidth;
+  const y = value => top + plotHeight - (value / maxValue) * plotHeight;
+  const historicalPoints = history.map((point, index) => x(index) + "," + y(point.units)).join(" ");
+  const forecastPoints = [
+    ...(history.length ? [x(history.length - 1) + "," + y(history[history.length - 1].units)] : []),
+    ...forecast.map((point, index) => x(history.length + index) + "," + y(point.units)),
+  ].join(" ");
+  const gridValues = [0, 0.25, 0.5, 0.75, 1].map(fraction => maxValue * fraction);
+  return <div className="intelligence-chart-wrap">
+    <div className="intelligence-chart-legend"><span><i className="legend-history" /> Historical consumption (last 30 days)</span><span><i className="legend-forecast" /> Forecast (next 30 days)</span></div>
+    <svg className="intelligence-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={group.bloodGroup + " historical consumption and 30-day demand forecast"}>
+      {gridValues.map((value, index) => <g key={index}><line x1={left} x2={width-right} y1={y(value)} y2={y(value)} stroke="#e7ebf1" strokeDasharray="4 4" /><text x={left-8} y={y(value)+4} textAnchor="end" fontSize="10" fill="#778397">{Math.round(value)}</text></g>)}
+      {history.length > 0 && <polyline points={historicalPoints} fill="none" stroke="#3267e9" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />}
+      {forecast.length > 0 && <polyline points={forecastPoints} fill="none" stroke="#168c86" strokeWidth="3" strokeDasharray="7 5" strokeLinejoin="round" strokeLinecap="round" />}
+      <line x1={x(Math.max(0, history.length-1))} x2={x(Math.max(0, history.length-1))} y1={top} y2={top+plotHeight} stroke="#98a2b3" strokeDasharray="3 4" />
+      <text x={left} y={height-8} fontSize="10" fill="#778397">30 days ago</text>
+      <text x={x(Math.max(0, history.length-1))+5} y={height-8} fontSize="10" fill="#778397">Today</text>
+      <text x={width-right} y={height-8} textAnchor="end" fontSize="10" fill="#778397">+30 days</text>
+    </svg>
+    <div className="intelligence-chart-summary">
+      <span>Current stock <b>{group.currentStockUnits} units</b></span>
+      <span>Recent 7-day average <b>{group.recent7DayAverage} units/day</b></span>
+      <span>30-day predicted demand <b>{group.predictedDemand30Days} units</b></span>
+    </div>
+  </div>;
 }
 
 
