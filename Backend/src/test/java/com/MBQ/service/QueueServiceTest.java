@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -147,6 +148,8 @@ class QueueServiceTest {
 
         assertEquals(11L, response.departmentId());
         assertEquals("Cardiology", response.departmentName());
+        assertEquals(ZoneOffset.UTC, response.timeIssued().getOffset(),
+                "Queue timestamps must be returned with an explicit UTC offset");
         verify(staffAccess).requireDepartmentAssignmentAccess(cardiology);
         verify(historyRepository).save(any(QueueTicketStatusHistory.class));
     }
