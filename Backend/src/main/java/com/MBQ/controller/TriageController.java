@@ -1,9 +1,14 @@
 package com.MBQ.controller;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -87,5 +92,43 @@ public class TriageController {
             @Valid @RequestBody ReviewRequest request) {
 
         return triageService.review(assessmentId, request);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleTriageError(
+            ResponseStatusException exception) {
+        String detail = exception.getReason() == null
+                ? "The triage request could not be completed."
+                : exception.getReason();
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        String formError = null;
+        if (detail.equals("patientId is required") || detail.equals("Patient not found")) {
+            fieldErrors.put("patientId", detail);
+        } else if (detail.equals("Queue ticket not found")) {
+            fieldErrors.put("queueTicketId", detail);
+        } else if (detail.startsWith("systolicBp must be")) {
+            fieldErrors.put("systolicBp", detail);
+        } else if (detail.startsWith("diastolicBp must be")) {
+            fieldErrors.put("diastolicBp", detail);
+        } else if (detail.startsWith("temperatureC must be")) {
+            fieldErrors.put("temperatureC", detail);
+        } else if (detail.startsWith("heartRate must be")) {
+            fieldErrors.put("heartRate", detail);
+        } else if (detail.startsWith("respiratoryRate must be")) {
+            fieldErrors.put("respiratoryRate", detail);
+        } else if (detail.startsWith("spo2Percent must be")) {
+            fieldErrors.put("spo2Percent", detail);
+        } else if (detail.startsWith("Systolic blood pressure")) {
+            fieldErrors.put("systolicBp", detail);
+            fieldErrors.put("diastolicBp", detail);
+        } else {
+            formError = detail;
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", exception.getStatusCode().value());
+        body.put("error", "Triage request failed");
+        body.put("fieldErrors", fieldErrors);
+        body.put("formError", formError);
+        return ResponseEntity.status(exception.getStatusCode()).body(body);
     }
 }
