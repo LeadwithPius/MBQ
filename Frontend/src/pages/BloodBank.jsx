@@ -278,7 +278,7 @@ function BloodRequestsPanel({ requests, patients, stock, canRequest, canReview, 
         headers: { "Idempotency-Key": idempotencyKey() },
         body: { stockId },
       }),
-      result => "Request #" + request.id + " fulfilled. " + result.unitsChanged + " unit(s) issued from "
+      result => "Request #" + request.id + " fulfilled. " + result.unitsChanged + " unit(s) issued from " +
         (selectedStock ? groupLabel(selectedStock.bloodGroup) : "selected stock") + "."
     );
   };
