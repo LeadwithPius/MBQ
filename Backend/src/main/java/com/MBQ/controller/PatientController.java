@@ -64,6 +64,7 @@ public class PatientController {
                 patient.getId(),
                 patient.getName(),
                 patient.getAge(),
+                patient.getNrcNumber(),
                 patient.getSex(),
                 patient.getContact(),
                 patient.getBloodGroup(),
