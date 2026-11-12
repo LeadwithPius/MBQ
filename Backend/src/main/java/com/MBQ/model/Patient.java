@@ -11,6 +11,8 @@ public class Patient {
     @Column(nullable = false)
     private String name;
     private Integer age;                  // ERD has Age_Sex; FR1 lists them separately
+    @Column(name = "nrc_number", length = 20)
+    private String nrcNumber;
     private String sex;
     private String contact;
     @Enumerated(EnumType.STRING)
