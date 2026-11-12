@@ -71,6 +71,25 @@ public class QueueService {
     public PatientResponse registerPatient(PatientRegistrationRequest request) {
         staffAccess.requireFacilityAccess(request.facilityId());
 
+        String nrcNumber = normalizeNrcNumber(request.nrcNumber());
+        if (request.age() == null || request.age() >= 18) {
+            if (nrcNumber == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "NRC number is required for patients aged 18 or older.");
+            }
+        }
+        if (nrcNumber != null && !nrcNumber.matches("\\d{6}/\\d{2}/\\d")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Enter a valid NRC number in the format 123456/78/9.");
+        }
+        if (nrcNumber != null && patientRepository.existsByNrcNumberIgnoreCase(nrcNumber)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "A patient with this NRC number is already registered.");
+        }
+
         Facility facility = facilityRepository.findById(request.facilityId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Facility not found"));
@@ -78,12 +97,25 @@ public class QueueService {
         Patient patient = new Patient();
         patient.setName(request.name().trim());
         patient.setAge(request.age());
+        patient.setNrcNumber(nrcNumber);
         patient.setSex(trimToNull(request.sex()));
         patient.setContact(trimToNull(request.contact()));
         patient.setBloodGroup(request.bloodGroup());
         patient.setFacility(facility);
 
         return toPatientResponse(patientRepository.save(patient));
+    }
+
+    private String normalizeNrcNumber(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        String digits = trimmed.replace("/", "").replace("-", "").replaceAll("\\s+", "");
+        if (!digits.matches("\\d{9}")) {
+            return trimmed;
+        }
+        return digits.substring(0, 6) + "/" + digits.substring(6, 8) + "/" + digits.substring(8);
     }
 
     @Transactional
@@ -357,6 +389,7 @@ public class QueueService {
                 patient.getId(),
                 patient.getName(),
                 patient.getAge(),
+                patient.getNrcNumber(),
                 patient.getSex(),
                 patient.getContact(),
                 patient.getBloodGroup(),
