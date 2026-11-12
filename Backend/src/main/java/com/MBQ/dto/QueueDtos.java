@@ -26,6 +26,9 @@ public final class QueueDtos {
             @Max(130)
             Integer age,
 
+            @Size(max = 20)
+            String nrcNumber,
+
             @Size(max = 255)
             String sex,
 
@@ -43,6 +46,7 @@ public final class QueueDtos {
             Long id,
             String name,
             Integer age,
+            String nrcNumber,
             String sex,
             String contact,
             BloodGroup bloodGroup,
